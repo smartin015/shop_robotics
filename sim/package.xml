@@ -1,10 +1,10 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>l2_sim</name>
+  <name>shop_robotics</name>
   <version>0.0.0</version>
-  <description>L2 simulator node</description>
-  <maintainer email="contact@fabricate.io">Fabricate.IO</maintainer>
+  <description>simulator nodes for workshop robotics</description>
+  <maintainer email="smartin015@gmail.com">Scott Martin</maintainer>
   <license>MIT</license>
 
   <buildtool_depend>ament_python</buildtool_depend>
