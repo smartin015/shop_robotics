@@ -60,3 +60,11 @@ docker buildx build --progress=plain --tag sim .
 ```shell
 docker-compose -p shop_robotics --profile <webots|gamepad|headless|tribot_headless> up
 ```
+
+
+# Extras
+
+Possibly useful for getting MoveIt! control working: 
+
+- (ROS) https://github.com/ongdexter/ar3_core
+- (ROS2) https://github.com/RIF-Robotics/ar3_ros
