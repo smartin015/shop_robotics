@@ -58,5 +58,5 @@ docker buildx build --progress=plain --tag sim .
 ## Running profiles
 
 ```shell
-docker-compose up -p shop_robotics --profile <webots|gamepad|headless|tribot_headless>
+docker-compose -p shop_robotics --profile <webots|gamepad|headless|tribot_headless> up
 ```

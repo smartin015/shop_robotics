@@ -46,14 +46,14 @@ x-sim:
 services:
   fw_native:
     <<: *firmware
-    entrypoint: ["bash", "-c", "pio run -e native --silent && .pio/build/native/program"]
+    command: ["bash", "-c", "pio run -e native --silent && .pio/build/native/program"]
     profiles:
      - gamepad
      - headless
      - webots
   fw_native3:
     <<: *firmware
-    entrypoint: ["bash", "-c", "pio run -e native3 --silent && .pio/build/native3/program"]
+    command: ["bash", "-c", "pio run -e native3 --silent && .pio/build/native3/program"]
     profiles:
      - headless_tribot
   web_interface3:

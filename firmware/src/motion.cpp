@@ -269,7 +269,7 @@ void motion::write() {
   }
 
   // Apply some smoothing between current stepping and intent
-  if (ticks_since_last_print % STEP_INTERPOLATION_TICK_PD == 0) {
+  if (ticks_since_last_print % STEP_INTERPOLATION_TICK_PD == 0 && ticks_per_step[0] && ticks_per_step_smoothed[0]) {
     // Interpolation is done in the frequency domain, not the time domain, for linear speed response
     for (uint8_t i = 0; i < NUM_J; i++) {
       uint32_t uhz_real = (1000000 / ticks_per_step[i]);

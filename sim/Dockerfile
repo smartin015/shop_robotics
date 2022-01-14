@@ -5,18 +5,21 @@ ENV ROS_DISTRO=galactic
 ARG ROS2PKG=shop_robotics
 ARG ROS2NODES="node moveit servo"
 RUN <<EOM
-  apt-get update && apt-get -y install --no-install-recommends git curl gnupg2 lsb-release &&
+  apt-get update && apt-get -y install --no-install-recommends git curl gnupg2 lsb-release python3-pip &&
 
   echo "Installing ROS2"
   curl -s https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | apt-key add -
   sh -c 'echo "deb [arch=$(dpkg --print-architecture)] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" > /etc/apt/sources.list.d/ros2-latest.list'
 
-  echo "Installing ROS2, webots integration, colcon"
+  echo "Installing ROS2, colcon, other deps"
   apt-get update && apt-get install -y --no-install-recommends \
       ros-$ROS_DISTRO-ros-base \
-      ros-galactic-webots-ros2 \
-      python3-colcon-common-extensions
+      python3-colcon-common-extensions \
+      libzmq3-dev 
+    # ros-galactic-webots-ros2 \
  
+  pip3 install pyzmq
+
   echo 'source "/opt/ros/$ROS_DISTRO/setup.bash"' >> /root/.bashrc
 
   # echo "Installing MoveIt!"
