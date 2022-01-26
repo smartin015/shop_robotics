@@ -61,6 +61,20 @@ docker buildx build --progress=plain --tag sim .
 docker-compose -p shop_robotics --profile <webots|gamepad|headless|tribot_headless> up
 ```
 
+**Webots**
+
+This runs a webots simulation of the AR3 robotic arm, with a separate web interface (localhost:8000) and a simulated copy of the firmware which normally lives in the control board of the robot.
+
+**Headless**
+
+This runs a "stub" simulator (vastly simplified vs Webots) plus the firmware and web interface. Use this to prototype quickly on the web interface / firmware without having to restart Webots every time.
+
+The `tribot_headless` version runs a 3-joint simulation, to match the omniwheel robot's number of wheels.
+
+**Gamepad**
+
+This runs an additional process that connects to a USB XBox 360 controller and allows for jogging the robot. It's currently hardcoded for 3 axes only,
+and must be run along with another environment (e.g. `docker-compose --profile headless --profile gamepad up`)
 
 # Extras
 

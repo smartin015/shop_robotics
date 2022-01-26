@@ -48,7 +48,6 @@ services:
     <<: *firmware
     command: ["bash", "-c", "pio run -e native --silent && .pio/build/native/program"]
     profiles:
-     - gamepad
      - headless
      - webots
   fw_native3:
@@ -65,7 +64,6 @@ services:
     <<: *control
     command: python3 /volume/broker.py
     profiles:
-     - gamepad
      - headless
      - webots
   gamepad:
@@ -77,7 +75,6 @@ services:
     <<: *sim
     command: /bin/bash -i -c "ros2 run shop_robotics node --ros-args -p stub:=true"
     profiles:
-     - gamepad
      - headless
   stub_robot3: # webots_sim not started - does basic, headless simulation
     <<: *sim
