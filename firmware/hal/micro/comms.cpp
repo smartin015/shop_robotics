@@ -51,7 +51,7 @@ void comms::write(uint8_t* buf, int buflen) {
 }
 
 static char pfbuf[128];
-void comms::printf(char* format, ...) {
+void comms::printf(const char* format, ...) {
   va_list argptr;
   va_start(argptr, format);
   vsnprintf(pfbuf, sizeof(pfbuf), format, argptr);

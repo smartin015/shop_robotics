@@ -1,10 +1,14 @@
 #ifndef _HW_H
 #define _HW_H
 
+#include <unistd.h>
 #include <stdint.h>
 
 #define HIGH true
 #define LOW false
+
+void delayMicroseconds(uint16_t us);
+uint64_t millis();
 
 namespace hw {
   bool get_cur_cal(int idx);
@@ -15,8 +19,6 @@ namespace hw {
   void sync(); 
   void init();
   void loop();
-
-  uint64_t millis();
 
 } // namespace hw
 

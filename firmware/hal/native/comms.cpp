@@ -40,4 +40,8 @@ void write(uint8_t* buf, int buflen) {
   push.send(reply, zmq::send_flags::dontwait);
 }
 
+void printf(const char* format, ...) {
+
+}
+
 } // namespace comms

@@ -1,9 +1,8 @@
-#ifndef __ARDUINO_SHIM_H__
-#define __ARDUINO_SHIM_H__
+#ifndef __APP_HAL_H__
+#define __APP_HAL_H__
 
-#include <Arduino.h>
-
-// NOTE: millis() and delayMicroseconds() already defined
+// Device-specific constants and includes go in a hw.h file in `hal/<arch>/
+#include "hw.h"
 
 namespace hal {
 
@@ -21,4 +20,4 @@ void enableInterrupts();
 
 } // namespace hal
 
-#endif // __ARDUINO_SHIM_H__
+#endif // __APP_HAL_H__

@@ -6,6 +6,17 @@
 #include <zmq.hpp>
 #include <chrono>
 
+#define PUB_PD_MILLIS 100
+std::chrono::steady_clock::time_point pgm_start;
+
+uint64_t millis() {
+  return std::chrono::duration_cast<std::chrono::milliseconds>(
+              std::chrono::steady_clock::now() - pgm_start).count();
+}
+
+// No need to delay in native environment (non-realtime OS, makes us miss our tick freq deadline)
+void delayMicroseconds(uint16_t us) {}
+
 namespace hw {
 
 bool cur_cal[NUM_J];
@@ -25,13 +36,6 @@ zmq::context_t context (1);
 zmq::socket_t push_socket (context, ZMQ_PUSH);
 zmq::socket_t pull_socket (context, ZMQ_PULL);
 
-#define PUB_PD_MILLIS 100
-std::chrono::steady_clock::time_point pgm_start;
-
-uint64_t millis() {
-  return std::chrono::duration_cast<std::chrono::milliseconds>(
-              std::chrono::steady_clock::now() - pgm_start).count();
-}
 
 void init() {
   pgm_start = std::chrono::steady_clock::now();

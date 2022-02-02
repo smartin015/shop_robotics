@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include "comms.h"
 
 #define ERROR_LEVEL     0x01
 #define INFO_LEVEL      0x02
