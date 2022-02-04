@@ -24,6 +24,10 @@
 // It is assumed that the robot can be power cycled in a safe manner.
 #define HARD_MAX_PID_CONTRIBUTION 100000
 
+// Limit motors from ever turning faster than this rate.
+#define HARD_MAX_STEPS_PER_SECOND 60
+#define HARD_MIN_TICKS_PER_STEP (MOTION_WRITE_HZ/HARD_MAX_STEPS_PER_SECOND)
+
 // Set this wide enough that the step pin interrupt
 // can be triggered on the stepper driver - see driver 
 // manual for acceptable limits.
@@ -72,7 +76,8 @@ void motion::init() {
 
 void motion::print_state() {
   // NOTE: arduino doesn't include floating point printf by default; scale & cast floats
-  LOG_DEBUG("rx %u, dt %u\tds %u\tactive %s\twant m%02x p%d v%d\tgot m%02x p%d v%d --> stepvel %d ticks/step %d", 
+  LOG_DEBUG("%lu ms rx %u, dt %u\tds %u\tactive %s\twant m%02x p%d v%d\tgot m%02x p%d v%d --> stepvel %d ticks/step %d", 
+      millis(),
       msgs_received_since_last_print,
       ticks_since_last_print,
       steps_since_last_print,
@@ -118,7 +123,7 @@ bool emergency_decel(int dt) {
 
     // ticks/step = (ticks/sec) * (sec / step)
     //            = (ticks/sec) * (1 / step_speed)
-    ticks_per_step[i] = uint32_t(float(MOTION_WRITE_HZ) / ABS(step_vel[i]));
+    ticks_per_step[i] = MAX(HARD_MIN_TICKS_PER_STEP, uint32_t(float(MOTION_WRITE_HZ) / ABS(step_vel[i])));
     hal::stepDir(i, (step_vel[i] > 0) ? HIGH : LOW);    
   }
   hal::enableInterrupts();
@@ -178,7 +183,7 @@ bool motion::update() {
   }
 
   if (dt > 2 * state::settings.velocity_update_pd_millis) {
-    LOG_ERROR("too long between calls to update(); skipping");
+    LOG_ERROR("dt %d too long between calls to update(); skipping", dt);
     return false; // Avoid edge case in delta processing causing jumps in calculated pos/vel
   }
 
@@ -317,10 +322,8 @@ void motion::read() {
   }
 }
 
-/*
 void set_encoders(const int values[NUM_J]) {
   for (int i = 0; i < NUM_J; i++) {
     hal::writeEnc(i, values[i]);
   }
 }
-*/

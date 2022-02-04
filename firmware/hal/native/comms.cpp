@@ -16,10 +16,10 @@ namespace comms {
 
 void init() {
   int linger = 0;
-  LOG_DEBUG("Init comms PUSH socket: %s", ZMQ_PUSH_ADDR); 
+  LOG_INFO("COMM: PUSH: %s", ZMQ_PUSH_ADDR); 
   zmq_setsockopt(push, ZMQ_LINGER, &linger, sizeof(linger));
   push.bind(ZMQ_PUSH_ADDR);  
-  LOG_DEBUG("Init comms PULL socket: %s", ZMQ_PULL_ADDR); 
+  LOG_INFO("COMM: PULL: %s", ZMQ_PULL_ADDR); 
   zmq_setsockopt(pull, ZMQ_LINGER, &linger, sizeof(linger));
   pull.bind(ZMQ_PULL_ADDR);
 }

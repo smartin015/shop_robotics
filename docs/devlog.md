@@ -6,6 +6,18 @@ Substantial noise from J4 (smaller stepper driver) causing skips in encoder puls
 
 *   Root cause: noise from stepper lines causing interference in encoder wires. Routed stepper lines farther away from encoders and shielded them with metal fiber sleeving to reduce noise - works fine now!
 
+## 2022-02-02
+
+
+
+## 2022-02-01
+
+Whew, been a while. References for potentially using sACN (basically DMX-over-IP, replacing old DMX-512 stage lighting protocol) for macro style command and control of the AR3 / TriBot:
+
+* https://tigoe.github.io/DMX-Examples/dmx-intro.html
+* https://sacnview.org/documentation.html (GUI with sliders and such)
+* https://github.com/Hundemeier/sacn (`pip install sacn` for a simple sender/receiver)
+
 ## 2021-04-28
 
 Brief foray into building the CanBot: a tri-omniwheel autonomous table that can support 80+ lbs of payload. I've been modifying the firmware, controller, and stub sim to operate on only 3 joints, so that it can be reused between arm and wheeled applications. Since coordinated motion also comes with less constraints on a wheeled robot, I can test trajectory matching on the canbot before "graduating" to the AR3.

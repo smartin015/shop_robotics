@@ -2,8 +2,6 @@
 FROM cyberbotics/webots:R2022a-ubuntu20.04
 
 ENV ROS_DISTRO=galactic
-ARG ROS2PKG=shop_robotics
-ARG ROS2NODES="node moveit servo"
 RUN <<EOM
   apt-get update && apt-get -y install --no-install-recommends git curl gnupg2 lsb-release python3-pip &&
 
@@ -41,11 +39,13 @@ EOM
 # Copy in our webots config
 COPY config/Webots.conf /root/.config/Cyberbotics/
 
+ENV ROS2PKG=shop_robotics_sim
 COPY . /$ROS2PKG
 WORKDIR /$ROS2PKG
 # Switch to using bash as shell so ROS binaries are in $PATH
 SHELL ["bash", "-c"] 
 
+ENV ROS2NODES="sim moveit servo"
 RUN <<EOM
   echo "== Building the ROS2 package $ROS2PKG =="
   colcon build --event-handlers desktop_notification- status- --cmake-args -DCMAKE_BUILD_TYPE=Release

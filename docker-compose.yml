@@ -14,7 +14,8 @@ x-firmware:
   #   - ar3
   network_mode: host
   volumes:
-    - "./firmware:/volume"
+    - ./firmware:/volume
+    - /tmp:/tmp # IPC
   #  - "./firmware/.pio:/root/.pio"
   #  - "./firmware/.packages:/root/.platformio/packages"
 
@@ -24,12 +25,12 @@ x-control:
   image: shop_robotics_control
   working_dir: /volume
   environment:
-    - "PYTHONUNBUFFERED=1"
+    - PYTHONUNBUFFERED=1
   # networks: 
   #  - ar3
   network_mode: host
   volumes:
-    - "./control/:/volume"
+    - ./control/:/volume
   #ports:
   #  - "8000:8000" # Web server
   #  - "8001:8001" # Websocket server
@@ -41,28 +42,25 @@ x-sim:
   image: shop_robotics_sim
   network_mode: host  
   stop_grace_period: 1s
+  volumes:
+    - /tmp:/tmp # IPC
+  environment:
+    - PYTHONUNBUFFERED=1
 
 
 services:
   fw_native:
     <<: *firmware
-    command: ["bash", "-c", "pio run -e native --silent && .pio/build/native/program"]
+    # platformio.ini references $NUM_J variable
+    command: ["bash", "-c", "pio run -e native && .pio/build/native/program"]
+    environment:
+      NUM_J: "${NUM_J}"
     profiles:
      - headless
      - webots
-  fw_native3:
-    <<: *firmware
-    command: ["bash", "-c", "pio run -e native3 --silent && .pio/build/native3/program"]
-    profiles:
-     - headless_tribot
-  web_interface3:
+  web_broker:
     <<: *control
-    command: python3 /volume/broker.py -j 3
-    profiles:
-     - headless_tribot
-  web_interface:
-    <<: *control
-    command: python3 /volume/broker.py
+    command: /bin/bash -i -c "python3 /volume/broker.py -j ${NUM_J}"
     profiles:
      - headless
      - webots
@@ -73,21 +71,14 @@ services:
      - gamepad
   stub_robot: # webots_sim not started - does basic, headless simulation
     <<: *sim
-    command: /bin/bash -i -c "ros2 run shop_robotics node --ros-args -p stub:=true"
+    command: /bin/bash -i -c "ros2 run shop_robotics_sim sim --ros-args -p stub:=true -p num_j:=${NUM_J}"
     profiles:
      - headless
-  stub_robot3: # webots_sim not started - does basic, headless simulation
-    <<: *sim
-    command: /bin/bash -i -c "ros2 run shop_robotics node --ros-args -p stub:=true -p num_j:=3"
-    profiles:
-     - headless_tribot
   sim_robot:
     <<: *sim
     depends_on:
-      - "webots_sim"
-    volumes:
-      - /tmp:/tmp # Used to sense when webots started
-    command: /bin/bash -i -c "ros2 run shop_robotics node"
+      - webots_sim
+    command: /bin/bash -i -c "ros2 run shop_robotics_sim sim --ros-args -p num_j:=${NUM_J}"
     profiles:
       - webots
   webots_sim:
@@ -103,7 +94,7 @@ services:
     volumes:
       - ./sim:/volume
       - ./sim/config:/root/.config/Cyberbotics/
-      - /tmp:/tmp
+      - /tmp:/tmp # IPC
     # entrypoint: bash
     # --stream="port=2000"
     command: /usr/local/webots/webots --batch --mode=realtime /volume/webots/worlds/world.wbt

@@ -7,11 +7,9 @@
 #include <chrono>
 
 #define PUB_PD_MILLIS 100
-std::chrono::steady_clock::time_point pgm_start;
-
+uint64_t sim_millis = 0;
 uint64_t millis() {
-  return std::chrono::duration_cast<std::chrono::milliseconds>(
-              std::chrono::steady_clock::now() - pgm_start).count();
+  return sim_millis;
 }
 
 // No need to delay in native environment (non-realtime OS, makes us miss our tick freq deadline)
@@ -19,62 +17,52 @@ void delayMicroseconds(uint16_t us) {}
 
 namespace hw {
 
-bool cur_cal[NUM_J];
-int steps[NUM_J];
+bool limit[NUM_J];
+int32_t steps[NUM_J];
+int16_t encoder[NUM_J];
 
-bool get_cur_cal(int idx) { return cur_cal[idx]; }
-int get_steps(int idx) { return steps[idx]; }
+bool get_limit(int idx) { return limit[idx]; }
+int get_encoder(int idx) { return encoder[idx]; }
 
 void move_steps(int idx, int delta) { 
   steps[idx] += delta; 
 }
 
-#define PUSH_ADDR "tcp://*:5556"
-#define PULL_ADDR "tcp://*:5557"
-
+// Single socket handles bidirectional syncing between simulation and firmware
 zmq::context_t context (1);
-zmq::socket_t push_socket (context, ZMQ_PUSH);
-zmq::socket_t pull_socket (context, ZMQ_PULL);
-
+zmq::socket_t sock = zmq::socket_t(context, ZMQ_REP);
+#define SOCKET_ADDR "ipc:///tmp/shop_robotics_hw.ipc"
 
 void init() {
-  pgm_start = std::chrono::steady_clock::now();
   int linger = 0;
-  zmq_setsockopt(push_socket, ZMQ_LINGER, &linger, sizeof(linger));
-  push_socket.bind(PUSH_ADDR);  
-  zmq_setsockopt(pull_socket, ZMQ_LINGER, &linger, sizeof(linger));
-  pull_socket.bind(PULL_ADDR);
-  LOG_DEBUG("HW: pushing steps on %s with period %dms, pull limits on %s", 
-            PUSH_ADDR, PUB_PD_MILLIS, PULL_ADDR); 
+  zmq_setsockopt(sock, ZMQ_LINGER, &linger, sizeof(linger));
+  LOG_DEBUG("HW: REP: %s", SOCKET_ADDR); 
+  sock.connect(SOCKET_ADDR);
   for (int i = 0; i < NUM_J; i++) {
     steps[i] = 0;
-    cur_cal[i] = true;
+    limit[i] = true;
   }
 }
 
-uint64_t next_publish = 0;
 void loop() {
-  if (millis() > next_publish) {
-    zmq::message_t msg(NUM_J * sizeof(int));
-    for (int i = 0; i < NUM_J; i++) {
-      ((int*)msg.data())[i] = steps[i];
-    }
-    push_socket.send(msg, zmq::send_flags::dontwait);  
-    next_publish += PUB_PD_MILLIS;
-  }
-  sync();
-}
-
-void sync() {
   zmq::message_t resp;
-  if (pull_socket.recv(resp, zmq::recv_flags::dontwait)) {
-    char buf[NUM_J];
-    for (int i = 0; i < NUM_J; i++) {
-      cur_cal[i] = (bool) ((char*)resp.data())[i];
-      buf[i] = (cur_cal[i]) ? '1' : '0';
-    }
-    LOG_INFO("New limit state received: %s", buf); 
-  } 
+  sock.recv(resp);
+
+  uint8_t* payload = ((uint8_t*)resp.data());
+  sim_millis = *((uint64_t*)payload); // 8 bytes clock in milliseconds
+  for (int i = 0; i < NUM_J; i++) {
+    // 5th byte is all limit switches in a mask
+    limit[i] = (bool) (*(payload+sizeof(uint64_t)) & (0x01 << i));
+
+    // Remaining data is encoders
+    encoder[i] = ((int32_t*)(payload+sizeof(uint64_t)+sizeof(uint8_t)))[i];
+  }
+  // LOG_DEBUG("HW packet: %lu %d %d", millis(), limit[0], encoder[0]);
+  zmq::message_t msg(NUM_J * sizeof(uint32_t));
+  for (int i = 0; i < NUM_J; i++) {
+    ((uint32_t*)msg.data())[i] = steps[i];
+  }
+  sock.send(msg);  
 }
 
 } // namespace hw

@@ -6,6 +6,8 @@ Ensembles of programs are started via the `./launch.sh` script.
 
 # Layout
 
+https://docs.google.com/drawings/d/1Mtd4x5n-zbuuM7uRhCHO-HnwOfN_e4qv0sVR_wNz95c
+
 ## Docs
 
 Contains various docs / presentation elements
@@ -52,13 +54,13 @@ docker-compose build
 
 For manual/test image builds of the sim container, with more logs:
 ```
-docker buildx build --progress=plain --tag sim .
+docker buildx build --progress=plain --tag shop_robotics_sim .
 ```
 
 ## Running profiles
 
 ```shell
-docker-compose -p shop_robotics --profile <webots|gamepad|headless|tribot_headless> up
+docker-compose --env-file tribot.env -p shop_robotics --profile <webots|gamepad|headless> up
 ```
 
 **Webots**
@@ -82,3 +84,10 @@ Possibly useful for getting MoveIt! control working:
 
 - (ROS) https://github.com/ongdexter/ar3_core
 - (ROS2) https://github.com/RIF-Robotics/ar3_ros
+
+
+# Lessons learned
+
+* ZeroMQ: IPC can handle PAIR sockets, but:
+  * If multiple users (i.e. firmware & sim containers, since firmware runs as a user and not root) the file must have the correct unix permissions (chmod 777 to be lazy)
+  * Socket must remain open on both ends. When it closes, it can't be reopened. This is a property of PAIR sockets.

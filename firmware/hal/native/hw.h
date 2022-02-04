@@ -11,12 +11,11 @@ void delayMicroseconds(uint16_t us);
 uint64_t millis();
 
 namespace hw {
-  bool get_cur_cal(int idx);
-  int get_steps(int idx);
+  bool get_limit(int idx);
+  int get_encoder(int idx);
 
   void move_steps(int idx, int delta);
   
-  void sync(); 
   void init();
   void loop();
 

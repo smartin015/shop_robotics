@@ -7,10 +7,13 @@
 #include <cstdlib>
 #include <thread>
 
+// The amount of time we expect a full loop of the firmware to take,
+// on an embedded controller.
+#define SIMULATED_LOOP_TIME_MILLIS 2
+
 int cur_dir[NUM_J];
 bool prev_step_pin[NUM_J];
 int step_offs[NUM_J];
-
 
 // For some reason, Ctrl+C isn't detected when
 // running the native program via `pio` in Docker,
@@ -41,16 +44,15 @@ void stepUp(int i) {
 void stepEnabled(int i, bool en) {}
 
 bool readLimit(int i) {
-  hw::sync();
-  return hw::get_cur_cal(i);
+  return hw::get_limit(i);
 }
 
 int readEnc(int idx) {
-  return hw::get_steps(idx); // TODO + step_offs[idx];
+  return hw::get_encoder(idx) + step_offs[idx];
 }
 
 void writeEnc(int idx, int value) {
-  step_offs[idx] = value - hw::get_steps(idx);
+  step_offs[idx] = value - hw::get_encoder(idx);
   LOG_DEBUG("Wrote %d to encoder %d", value, idx);
 }
 
@@ -87,17 +89,21 @@ void startMainTimer(int hz, void(*cb)()) {
 void setup();
 void loop();
 int main() {
-  hw::init();
   signal(SIGINT, signal_callback_handler);
   signal(SIGTERM, signal_callback_handler);
+  hw::init();
   for (int i = 0; i < NUM_J; i++) {
     cur_dir[i] = 1;
     step_offs[i] = 0;
     prev_step_pin[i] = true;
   }
   setup();
+  uint64_t loop_time = 0;
   while (1) {
-    hw::loop(); // Hidden hardware emulation
-    loop();
+    hw::loop(); // Hidden hardware emulation; includes setting millis() to sim clock
+    while (loop_time < millis()) {
+      loop();
+      loop_time += SIMULATED_LOOP_TIME_MILLIS;
+    }
   }
 }
