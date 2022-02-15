@@ -46,10 +46,10 @@ To setup a dev environment, you will need:
 
 ## Building containers
 
-For the simulation container, you will need to enable BuildKit for docker (see above).
+For the simulation container, you will need to enable BuildKit for docker (see above). You can ignore the warnings about missing environment variables, as they aren't used at build time.
 
 ```shell
-docker-compose build
+docker-compose --profile headless --profile webots build
 ```
 
 For manual/test image builds of the sim container, with more logs:
@@ -66,6 +66,8 @@ docker-compose --env-file tribot.env -p shop_robotics --profile <webots|gamepad|
 **Webots**
 
 This runs a webots simulation of the AR3 robotic arm, with a separate web interface (localhost:8000) and a simulated copy of the firmware which normally lives in the control board of the robot.
+
+Note that with `--stream` supplied in the `webots_sim` container command, you can visit `http://ip:1234/index.html` to see the [streaming server](https://cyberbotics.com/doc/guide/web-streaming) view of the robot simulation.
 
 **Headless**
 
