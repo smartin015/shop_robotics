@@ -54,6 +54,12 @@
     margin-left: auto;
     margin-right: auto;
   }
+  table th {
+    text-align: center !important;
+  }
+  table tr:hover {
+    background-color: inherit !important;
+  }
 
   label.is-checked > span.mdl-checkbox__label {
     color: red;
@@ -93,47 +99,37 @@
           <span class = "mdl-checkbox__label">limit override</span>
        </label>
       </div>
-
-      <div class="canvasContainer">
-        <canvas id="posCanvas" width="400" height="400">[No canvas support]</canvas>
-        <div class="linearCanvas">
-          <canvas id="velCanvas" width="500" height="200" style="width: 100%">[No canvas support]</canvas>
-          <canvas id="accCanvas" width="500" height="200" style="width: 100%">[No canvas support]</canvas>
-        </div>
-      </div>
-
-      <div class="linearCanvasSettings">
-        <form id="linear_canvas_settings">
-          <div class="mdl-textfield mdl-js-textfield">
-            <input class="mdl-textfield__input" type="text" id="pid_d">
-            <label class="mdl-textfield__label" for="pid_d">meters per rev</label>
-          </div>
-          <button class="mdl-button mdl-js-button mdl-button--raised" type="submit">
-            Update units
-          </button>
-        </form>
-      </div>
+    </div>
 
     <table class="mdl-data-table mdl-js-data-table" style="background-color: transparent !important;">
       <thead>
         <tr>
+          <th>Step/encoder</th>
+          <th>Vel/accel</th>
           <th>Mask</th>
-          <th class="mdl-data-table__cell--non-numeric">Position</th>
-          <th>Target (rad)</th>
-          <th>Value</th>
+          <th>Step pos</th>
+          <th>Encoder</th>
+          <th>Target</th>
           <th class="mdl-data-table__cell--non-numeric">Velocity</th>
-          <th>Target (rad/s)</th>
           <th>Value</th>
+          <th>Target (rad/s)</th>
         </tr>
       </thead>
       <tbody>
         <tr id="repeatntimes">
+          <td>
+            <canvas class="radCanvas" width="200" height="200">[No canvas support]</canvas>
+          </td>
+          <td>
+            <canvas class="linCanvas" width="500" height="200" style="width: 100%">[No canvas support]</canvas>
+          </td>
           <td class="mask"></td>
           <td style="width:300px">
             <input class="mdl-slider mdl-js-slider posslider" type="range" id="s6" min="-3.14159" max="3.14159" value="0" step="0.1">
           </td>
-          <td class="postgt">0</td>
           <td class="posval">#</td>
+          <td class="encval">#</td>
+          <td class="postgt">0</td>
           <td style="width:300px">
             <input class="mdl-slider mdl-js-slider velslider" type="range" id="s6" min="-1.0" max="1.0" value="0.25" step="0.025">
           </td>
@@ -171,8 +167,6 @@ const MASK_ENABLED = 0b1;
 const MASK_LIMIT_TRIGGERED = 0b10;
 const MASK_OPEN_LOOP_CONTROL = 0b100;
 
-const STEP = 32768;
-const STEPS_PER_REV = [STEP,STEP,STEP,STEP,STEP,STEP];
 const GRAPH_DOMAIN_SEC = 20;
 const SEND_STATE_PD_MILLIS = 100;
 const EVENT_LOG_PD = 10000;
@@ -180,11 +174,11 @@ const EVENT_LOG_PD = 10000;
 // https://medium.com/cafe-pixo/inclusive-color-palettes-for-the-web-bbfe8cf2410e
 const INCLUSIVE_COLORS = ['#E1DAAE', '#FF934F', '#CC2D35', '#058ED9', '#848FA2', '#2D3142'];
 
-function initGraph(id, yMin, yMax, title, units) {
+function initGraph(id, nSeries, yMin, yMax, title, units) {
   // https://www.rgraph.net/canvas/howto-scrolling.html
   return new RGraph.Line({
       id,
-      data: [...Array(state.num_j)].map(e => Array(GRAPH_DOMAIN_SEC * 1000 / SEND_STATE_PD_MILLIS)),
+      data: [...Array(nSeries)].map(e => Array(GRAPH_DOMAIN_SEC * 1000 / SEND_STATE_PD_MILLIS)),
       options: {
           title: title,
           titleSize: 12,
@@ -231,12 +225,13 @@ function millis() {
 let lastSendState = 0;
 function sendState() {
   if (ws.readyState === ws.OPEN && state.send_state) {
-    let buf = new ArrayBuffer(state.num_j * 7);
+    let buf = new ArrayBuffer(state.num_j * 9);
     let view = new DataView(buf);
     for (let i = 0; i < state.num_j; i++) {
       view.setInt8(i, state.tmask[i], true);
       view.setInt32(state.num_j + 4*i, state.tpos[i], true);
       view.setInt16(5*state.num_j + 2*i, state.tvel[i], true);
+      view.setInt16(7*state.num_j + 2*i, state.enc[i], true);
     }
     ws.send(buf);
   }
@@ -249,12 +244,13 @@ function tick() {
     sendState();
   }
 
-  // Clear (NOT reset) the canvas
-  RGraph.clear(ui.velgraph.canvas);
-  RGraph.clear(ui.accgraph.canvas);
-  ui.posgraph.draw();
-  ui.velgraph.draw();
-  ui.accgraph.draw();
+  for (let i = 0; i < state.num_j; i++) {
+    // Clear (NOT reset) the canvas
+    RGraph.clear(ui.radgraphCanvas[i]);
+    RGraph.clear(ui.lingraphCanvas[i]);
+    ui.radgraph[i].draw();
+    ui.lingraph[i].draw();
+  }
 }
 
 function handleMessage(event) {
@@ -276,41 +272,33 @@ function handleMessage(event) {
       return;
     }
 
-    let posdata = [];
     for (let i = 0; i < state.num_j; i++) {
       state.mask[i]= view.getInt8(i, true);
       state.pos[i] = view.getInt32(state.num_j + 4*i, true);
       state.vel[i] = view.getInt16(5*state.num_j + 2*i, true);
+      state.enc[i] = view.getInt16(7*state.num_j + 2*i, true);
 
       ui.mask[i].innerText = state.mask[i].toString(2).padStart(8, '0'); 
 
-      let pos_norm = state.pos[i] * (2*Math.PI)/STEPS_PER_REV[i];
-      posdata[i] = pos_norm;
+      let pos_norm = state.pos[i] * (2*Math.PI)/state.steps_per_rev[i];
       ui.posval[i].innerText = pos_norm.toFixed(2);
 
-      let vel_norm = state.vel[i] * (2*Math.PI)/STEPS_PER_REV[i];
-      ui.velgraph.original_data[i].shift();
-      ui.velgraph.original_data[i].push((state.m_per_rev || 1) * vel_norm / (2*Math.PI));
+      let enc_norm = state.enc[i] * (2*Math.PI)/state.encoder_ticks_per_rev[i];
+      ui.encval[i].innerText = enc_norm.toFixed(2);
+
+      let vel_norm = state.vel[i] * (2*Math.PI)/state.steps_per_rev[i];
+      ui.lingraph[i].original_data[0].shift();
+      ui.lingraph[i].original_data[0].push(vel_norm / (2*Math.PI));
       ui.velval[i].innerText = vel_norm.toFixed(2);
 
-      ui.accgraph.original_data[i].shift();
-      let vgl = ui.velgraph.original_data[i].length;
-      let accel = ui.velgraph.original_data[i][vgl-1] - ui.velgraph.original_data[i][vgl-2];
-      ui.accgraph.original_data[i].push(accel);
+      ui.lingraph[i].original_data[1].shift();
+      let vgl = ui.lingraph[i].original_data[0].length;
+      let accel = ui.lingraph[i].original_data[0][vgl-1] - ui.lingraph[i].original_data[0][vgl-2];
+      ui.lingraph[i].original_data[1].push(accel);
+
+      ui.radgraph[i].add_data([pos_norm, enc_norm]);
     }
-    ui.posgraph.add_data(posdata);
   });
-}
-
-function setUnits(event) {
-  event.preventDefault();
-  console.log(event);
-  state.m_per_rev = parseFloat(event.target[0].value);
-
-  let scale = 1.5*state.m_per_rev/(2*Math.PI);
-  ui.velgraph = initGraph("velCanvas", -scale, scale, "Velocity", "m/s");
-  ui.accgraph = initGraph("accCanvas", -scale, scale, "Acceleration", "m/s^2");
-  console.log(`Set units to ${state.m_per_rev} m/rev`);
 }
 
 function pushSettings(event) {
@@ -358,15 +346,24 @@ function startWebsocket() {
   ws.onmessage = handleMessage;
 }
 
-function init(num_j) {
-  console.log(`${num_j} joints`);
+function loadCArray(s) {
+  return JSON.parse(s.replace("{", "[").replace("}","]"));
+}
 
+function init(host_env) {
+  console.log(host_env);
+
+  let num_j = parseInt(host_env['NUM_J']);
   state = {
     num_j,
     send_state: false, // Off by default in case other controllers are active
-    m_per_rev: null,
+    steps_per_rev: loadCArray(host_env['STEPS_PER_REV']),
+    encoder_ticks_per_rev: loadCArray(host_env['ENCODER_TICKS_PER_REV']),
+    motor_min_radians: loadCArray(host_env['MOTOR_MIN_RADIANS']),
+    motor_max_radians: loadCArray(host_env['MOTOR_MAX_RADIANS']),
     pos: Array(num_j).fill(0),
     vel: Array(num_j).fill(0),
+    enc: Array(num_j).fill(0),
     mask: Array(num_j).fill(0),
     tpos: Array(num_j).fill(0),
     tpos_norm: Array(num_j).fill(0),
@@ -374,43 +371,49 @@ function init(num_j) {
     tmask: Array(num_j).fill(0),
     last_event_log: millis(),
   };
+  console.log("State:", state);
 
   let tmpl = document.getElementById("repeatntimes");
   let tbody = document.querySelector("tbody");
   for (let i = 1; i < state.num_j; i++) {
     tbody.appendChild(tmpl.cloneNode(true));
   }
+  console.log("Cloned elements");
 
   ui = {
     mask: document.getElementsByClassName("mask"),
-
-    posslider: document.getElementsByClassName("posslider"),
     postgt: document.getElementsByClassName("postgt"),
+    encval: document.getElementsByClassName("encval"),
     posval: document.getElementsByClassName("posval"),
-    posgraph: new PolarChart(document.getElementById("posCanvas").getContext("2d"), 200, 200, 200, state.num_j, 80, INCLUSIVE_COLORS),
-    
+    radgraphCanvas: document.getElementsByClassName("radCanvas"),
+    lingraphCanvas: document.getElementsByClassName("linCanvas"),
+    radgraph: Array(state.num_j).fill(null),
+    lingraph: Array(state.num_j).fill(null),
     velslider: document.getElementsByClassName("velslider"),
     veltgt: document.getElementsByClassName("veltgt"),
     velval: document.getElementsByClassName("velval"),
-    velgraph: initGraph("velCanvas", -1.5, 1.5, "Velocity", "rad/s"),
-    accgraph: initGraph("accCanvas", -1.5, 1.5, "Acceleration", "rad/s^2"),
   };
+  console.log(ui);
 
 
   for (let i = 0; i < state.num_j; i++) {
+    console.log("Init polar chart", ui.radgraphCanvas[i]);
+    console.log("Init line chart", ui.lingraphCanvas[i]);
+    ui.lingraphCanvas[i].id = "line"+i; // ID based graph creation required :(
+    ui.radgraph[i] = new PolarChart(ui.radgraphCanvas[i], 100, 100, 100, 2, 80, INCLUSIVE_COLORS, (rad) => {
+      state.tpos_norm[i] = rad;
+      state.tpos[i] = Math.round(state.tpos_norm[i] / (2*3.14159) * state.steps_per_rev[i]);
+      ui.radgraph[i].set_targets([state.tpos_norm[i], 0]);
+      ui.postgt[i].innerText = rad.toFixed(2);
+    });
+    ui.lingraph[i] = initGraph(ui.lingraphCanvas[i].id, 2, -0.25, 0.25, "Velocity & Acceleration", "rad/s");
     // Apply colors matching the graphs
     for (let inp of tbody.children[i].querySelectorAll("input")) {
       inp.style = `background-color: ${INCLUSIVE_COLORS[i]}`;
     }
 
-    ui.posslider[i].oninput = (e) => {
-      state.tpos_norm[i] = e.target.value
-      state.tpos[i] = Math.round(state.tpos_norm[i] / (2*3.14159) * STEPS_PER_REV[i]);
-      ui.posgraph.set_targets(state.tpos_norm);
-      ui.postgt[i].innerText = parseFloat(e.target.value).toFixed(2);
-    }
     ui.velslider[i].oninput = (e) => {
-      state.tvel[i] = Math.round(e.target.value / (2*3.14159) * STEPS_PER_REV[i]);
+      state.tvel[i] = Math.round(e.target.value / (2*3.14159) * state.steps_per_rev[i]);
       ui.veltgt[i].innerText = parseFloat(e.target.value).toFixed(2);
     }
   }
@@ -421,14 +424,12 @@ function init(num_j) {
   document.getElementById("send_state").onchange = (event) => state.send_state = event.target.checked;
   
 	document.getElementById("fw_settings").onsubmit = (event) => pushSettings(event);
-  document.getElementById("linear_canvas_settings").onsubmit = (event) => setUnits(event);
-
 
   startWebsocket();
   setInterval(tick, 100);
 }
 window.onload = function() {
-  return fetch('/config').then(r => r.text()).then(data => init(parseInt(data)));
+  return fetch('/env').then(r => r.json()).then(init);
 }
 
 </script>

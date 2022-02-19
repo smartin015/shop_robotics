@@ -1,5 +1,14 @@
 version: "3.8"
 
+x-env:
+  &base_env
+  NUM_J: "${NUM_J}"
+  STEPS_PER_REV: "${STEPS_PER_REV}"
+  ENCODER_TICKS_PER_REV: "${ENCODER_TICKS_PER_REV}"
+  MOTOR_MIN_RADIANS: "${MOTOR_MIN_RADIANS}"
+  MOTOR_MAX_RADIANS: "${MOTOR_MAX_RADIANS}"
+  PYTHONUNBUFFERED: "1"
+
 x-firmware:
   &firmware
   build: ./firmware/
@@ -12,6 +21,8 @@ x-firmware:
   #  - "5556:5556" # Push state to sim (step counts)
   #networks: 
   #   - ar3
+  environment:
+    <<: *base_env
   network_mode: host
   volumes:
     - ./firmware:/volume
@@ -25,7 +36,7 @@ x-control:
   image: shop_robotics_control
   working_dir: /volume
   environment:
-    - PYTHONUNBUFFERED=1
+    <<: *base_env
   # networks: 
   #  - ar3
   network_mode: host
@@ -45,22 +56,19 @@ x-sim:
   volumes:
     - /tmp:/tmp # IPC
   environment:
-    - PYTHONUNBUFFERED=1
-
+    <<: *base_env
 
 services:
   fw_native:
     <<: *firmware
     # platformio.ini references $NUM_J variable
     command: ["bash", "-c", "pio run -e native && .pio/build/native/program"]
-    environment:
-      NUM_J: "${NUM_J}"
     profiles:
      - headless
      - webots
   web_broker:
     <<: *control
-    command: /bin/bash -i -c "python3 /volume/broker.py -j ${NUM_J}"
+    command: /bin/bash -i -c "python3 /volume/broker.py"
     profiles:
      - headless
      - webots
@@ -71,14 +79,14 @@ services:
      - gamepad
   stub_robot: # webots_sim not started - does basic, headless simulation
     <<: *sim
-    command: /bin/bash -i -c "ros2 run shop_robotics_sim sim --ros-args -p stub:=true -p num_j:=${NUM_J}"
+    command: /bin/bash -i -c "ros2 run shop_robotics_sim sim --ros-args -p stub:=true"
     profiles:
      - headless
   sim_robot:
     <<: *sim
     depends_on:
       - webots_sim
-    command: /bin/bash -i -c "ros2 run shop_robotics_sim sim --ros-args -p num_j:=${NUM_J}"
+    command: /bin/bash -i -c "ros2 run shop_robotics_sim sim"
     profiles:
       - webots
   webots_sim:

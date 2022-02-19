@@ -2,9 +2,10 @@ const PI = 3.14159265;
 const PADDING = 5;
 
 class PolarChart {
-  constructor(ctx,x,y,r,num_j,num_samp,colors) {
+  constructor(canvas, x, y, r, num_j, num_samp, colors, cb) {
     this.colors = colors;
-    this.ctx = ctx;
+    this.canvas = canvas;
+    this.ctx = canvas.getContext("2d");
     this.x = x;
     this.y = y;
     this.r = r * 0.96;
@@ -14,6 +15,38 @@ class PolarChart {
     this.nticks = 30;
     this.data = [...Array(num_j)].map(e => Array(num_samp));
     this.targets = Array(num_j);
+
+    canvas.addEventListener('mousedown', this.on_mousedown.bind(this));
+    canvas.addEventListener('mousemove', this.on_mousemove.bind(this));
+    canvas.addEventListener('mouseup', this.on_mouseup.bind(this));
+    canvas.addEventListener('mouseout', this.on_mouseout.bind(this));
+    this.cb = cb;
+    this.mousing = false;
+  }
+
+  getCursorAngle(evt) {
+    const rect = this.canvas.getBoundingClientRect();
+    const x = evt.clientX - rect.left;
+    const y = evt.clientY - rect.top;
+    return Math.atan2(y-this.r, x-this.r);
+  }
+
+  on_mousedown(evt) {
+    this.mousing = true;
+    this.cb(this.getCursorAngle(evt));
+  }
+  on_mousemove(evt) {
+    if (!this.mousing) {
+      return;
+    }
+    this.cb(this.getCursorAngle(evt));
+  }
+  on_mouseup(evt) {
+    this.mousing = false;
+    this.cb(this.getCursorAngle(evt));
+  }
+  on_mouseout(evt) {
+    this.mousing = false;
   }
 
   draw_bg() {

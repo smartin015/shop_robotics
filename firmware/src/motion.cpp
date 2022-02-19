@@ -55,7 +55,14 @@ float err_vel[NUM_J];
 float pid_updates[NUM_J][3];
 bool active[NUM_J];
 
+const uint16_t steps_per_rev[NUM_J] = STEPS_PER_REV;
+const uint16_t encoder_ticks_per_rev[NUM_J] = ENCODER_TICKS_PER_REV;
+
 void motion::init() {
+  for (int i = 0; i < NUM_J; i++) {
+    LOG_INFO("Motor %d:\t%d step/rev\t%d encoder/rev", i, steps_per_rev[i], encoder_ticks_per_rev[i]);
+  }
+
   for (int i = 0; i < NUM_J; i++) {
     emergency_decel_triggered = false;
     limit_triggered[i] = false;

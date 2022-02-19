@@ -6,6 +6,7 @@ import threading
 import argparse
 import websockets
 import asyncio
+import json
 from random import random
 from collections import defaultdict
 from http.server import HTTPServer, SimpleHTTPRequestHandler
@@ -16,7 +17,6 @@ except:
     pass # ZMQ not needed as a dependency on the robot itself
 
 PACKET_START_BYTE = 0x02 # Matches ../firmware/hal/micro/comms.cpp
-NUM_J = None # Overridden by args
 MAX_BUFFERED_MESSAGES = 10
 
 class Broker():
@@ -96,17 +96,15 @@ signal.signal(signal.SIGTERM, sigterm_handler)
 
 class WebServer(SimpleHTTPRequestHandler):
     def do_GET(self):
-        global NUM_J
-        if self.path == "/config":
+        if self.path == "/env":
             self.send_response(200)
             self.send_header("Content-type", "text/plain")
             self.end_headers()
-            self.wfile.write(bytes(str(NUM_J), "utf-8"))
+            self.wfile.write(bytes(json.dumps(dict(os.environ)), "utf-8"))
         else:
             return SimpleHTTPRequestHandler.do_GET(self)
 
 async def handle_socket(ws, path):
-  global NUM_J
   print("WS conn", str(ws))
   if args.loopback:
       await ws_to_conn(ws)
@@ -116,7 +114,6 @@ async def handle_socket(ws, path):
 async def ws_to_conn(ws):
   print("Starting ws_to_conn")
   async for req in ws:
-    #print(req.hex(),"--->")
     if args.loopback:
       await asyncio.sleep(0.1)
       await ws.send(req)
@@ -129,7 +126,6 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument('--motion', default="passthrough", help="Type of motion control to use")
   parser.add_argument('--loopback', action='store_true', default=False, help="Transmit to self, for testing")
-  parser.add_argument('-j', default=6, type=int, help="Number of joints in robot (affects packet size & controls display")
   parser.add_argument('--dest', default="tcp://0.0.0.0:5559", help="Destination (ZMQ socket or serial dev path)")
   parser.add_argument('--pull', default="tcp://0.0.0.0:5558", help="PULL socket destination (ignored when --dest is serial")
   parser.add_argument('--websocket_port', default=8001, help="Port for websocket control")
@@ -137,7 +133,6 @@ if __name__ == "__main__":
   parser.add_argument('--web_dir', default="www", help="Web dir (relative to .py script)")
 
   args = parser.parse_args(sys.argv[1:])
-  NUM_J = args.j
 
   web_dir = os.path.join(os.path.dirname(__file__), args.web_dir)
   print("Serving files from", web_dir)

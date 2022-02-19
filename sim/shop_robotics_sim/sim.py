@@ -18,24 +18,15 @@ import signal
 import struct
 import threading
 import time
+import json
 
 def sigterm_handler(_signo, _stack_frame):
-    print("SIGTERM received, exiting")
+    sys.stderr.write("SIGTERM received, exiting\n")
     sys.exit(0)
 signal.signal(signal.SIGTERM, sigterm_handler)
 
-# NOTE: If num_joints < 6, the first num_joints values are used
-MOTOR_LIMITS = [
-  (-2.4, 2.4),
-  (-2.4, 1.8),
-  (-4.5, 1.3),
-  (-2.4, 2.4),
-  (-2.4, 2.4),
-  (-3.14, 3.14),
-]
-
 # Normalized for minposition-maxposition -1.0 to 1.0
-# NOTE: if num_joints < 6, the first num_joints values are used per target
+# NOTE: if NUM_J < 6, the first NUM_J values are used per target
 TARGETS = [
     [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
     [0.1, 0.0, 0.0, 0.0, 0.0, 0.0],
@@ -46,9 +37,14 @@ TARGETS = [
     [1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
 ]
 
-# NOTE: If num_joints < 6, the first num_joints values are used
-STEPS_PER_REV = [4096, 4096, 4096, 4096, 4096, 4096]
-ENCODER_TICKS_PER_REV = [4096, 4096, 4096, 4096, 4096]
+# Load hardware configuration from environment variables
+def loadCString(s):
+  return json.loads(s.replace("{","[").replace("}","]"))
+NUM_J = int(os.getenv("NUM_J"))
+STEPS_PER_REV = loadCString(os.getenv("STEPS_PER_REV"))
+ENCODER_TICKS_PER_REV = loadCString(os.getenv("ENCODER_TICKS_PER_REV"))
+MOTOR_MIN_RADIANS = loadCString(os.getenv("MOTOR_MIN_RADIANS"))
+MOTOR_MAX_RADIANS = loadCString(os.getenv("MOTOR_MAX_RADIANS"))
 
 class StubRobot:
   def __init__(self):
@@ -103,9 +99,7 @@ class AR3(Node):
         super().__init__('l2_ar3')
         self.declare_parameter("stub", False)
         self.declare_parameter("sock_addr", "ipc:///tmp/shop_robotics_hw.ipc")
-        self.declare_parameter("num_j", 6)
         self.declare_parameter("realtime", True)
-        self.num_joints = self.get_parameter('num_j').get_parameter_value().integer_value
         self.realtime = self.get_parameter('realtime').get_parameter_value().bool_value
         if self.realtime:
             self.get_logger().info("Limiting simulation to realtime")
@@ -116,7 +110,7 @@ class AR3(Node):
         ])
         self.clockpub = self.create_publisher(Clock, '/clock', 10)
 
-        self.joint_names = ["joint_%d" % (i+1) for i in range(self.num_joints)]
+        self.joint_names = ["joint_%d" % (i+1) for i in range(NUM_J)]
 
         if self.get_parameter('stub').get_parameter_value().bool_value:
           self.get_logger().info("Using StubRobot")
@@ -133,7 +127,7 @@ class AR3(Node):
           # https://github.com/cyberbotics/webots/blob/f9c017f55084b2d2ccf6cad7c94c97bb9c3ebd2c/src/controller/c/robot.c
           self.robot = Robot()
           if not self.robot:
-            print("Robot init failed")
+            self.get_logger().error("Robot init failed")
             os.exit(1)
         
         self.timestep = int(self.robot.getBasicTimeStep())
@@ -142,14 +136,17 @@ class AR3(Node):
             # https://cyberbotics.com/doc/reference/motor?tab-language=python#motor
             pid = (10.0, 0, 0)
             m.setControlPID(*pid)
-            m.minPosition = MOTOR_LIMITS[i][0]
-            m.maxPosition = MOTOR_LIMITS[i][1]
-            print("Motor %d configured for PID %s, range (%f,%f)" % (i, pid, m.getMinPosition(), m.getMaxPosition()))
-          
+            m.minPosition = MOTOR_MIN_RADIANS[i]
+            m.maxPosition = MOTOR_MAX_RADIANS[i]
+            self.get_logger().info("Motor %d: PID %s, range (%f,%f)" % (i, pid, m.getMinPosition(), m.getMaxPosition()))
+ 
+        self.get_logger().info(f"Steps per rev: {STEPS_PER_REV}")
+        self.get_logger().info(f"Encoder ticks per rev: {ENCODER_TICKS_PER_REV}")
+         
         self.sensors = [m.getPositionSensor() for m in self.motors]
         for s in self.sensors:
             s.enable(self.timestep)
-        self.limits = [False]*self.num_joints
+        self.limits = [False]*NUM_J
 
         self.get_logger().info("Socket init...")
         SOCKET_ADDR = self.get_parameter('sock_addr').get_parameter_value().string_value
@@ -206,7 +203,7 @@ class AR3(Node):
             pos = [s.getValue() for s in self.sensors] # TODO dedupe against joint_state_callback
             steps = [ int(p / (2*3.14159) * STEPS_PER_REV[i]) for (i, p) in enumerate(pos) ]
             millis = int(now * 1000)
-            msg = struct.pack('<QB' + 'i'*self.num_joints, millis, limit_mask, *steps)
+            msg = struct.pack('<QB' + 'i'*NUM_J, millis, limit_mask, *steps)
             self.hw_socket.send(msg) # send milliseconds over ZMQ and block for firmware to process
             steps = self.hw_socket.recv()
             if steps:
@@ -217,18 +214,18 @@ class AR3(Node):
         # When simulating firmware, we get raw step counts over ZMQ - these are 
         # referenced relative from simulation start pos
         limits_updated = False
-        for (i, s) in enumerate(struct.unpack('i'*self.num_joints, steps)):
+        for (i, s) in enumerate(struct.unpack('i'*NUM_J, steps)):
             angle = (2*3.14159) * s / STEPS_PER_REV[i]
             self.motors[i].setPosition(angle)
             # Only one side has actual limit switches; the other is a "breaking point"
-            inside_limits = (MOTOR_LIMITS[i][0] < angle)
-            if angle > MOTOR_LIMITS[i][1]:
+            inside_limits = (MOTOR_MIN_RADIANS[i] < angle)
+            if angle > MOTOR_MAX_RADIANS[i]:
               # Regardless of if we're on a side with a limit switch, we should throw warnings if we exceed
               # the non-switched side of the machine
-              self.get_logger().warn("non-switch limit %f exceeded for joint %d: angle is %f (not reported to fw)" % (MOTOR_LIMITS[i][1], i, angle), throttle_duration_sec=1)
+              self.get_logger().warn("non-switch limit %f exceeded for joint %d: angle is %f (not reported to fw)" % (MOTOR_MAX_RADIANS[i], i, angle), throttle_duration_sec=1)
             if self.limits[i] != inside_limits:
               limits_updated = True
-              self.get_logger().info("Limit switch %d state change - %d <- %d -> %d" % (i, MOTOR_LIMITS[i][0], angle, MOTOR_LIMITS[i][1]))
+              self.get_logger().info("Limit switch %d state change - %d <- %d -> %d" % (i, MOTOR_MIN_RADIANS[i], angle, MOTOR_MAX_RADIANS[i]))
             self.limits[i] = inside_limits
 
     def handle_joint_trajectory(self, jt):
@@ -261,7 +258,7 @@ class AR3(Node):
     def dance_callback(self):
         self.ti = (self.ti + 1) % len(TARGETS)
         for i, m in enumerate(self.motors):
-            m.setPosition((TARGETS[self.ti][i] + 1.0)/2.0 * (MOTOR_LIMITS[i][1]-MOTOR_LIMITS[i][0]) + MOTOR_LIMITS[i][0])
+            m.setPosition((TARGETS[self.ti][i] + 1.0)/2.0 * (MOTOR_MAX_RADIANS[i]-MOTOR_MIN_RADIANS[i]) + MOTOR_MIN_RADIANS[i])
         self.get_logger().info("New target " + str(TARGETS[self.ti]))
 
 def main(args=None):

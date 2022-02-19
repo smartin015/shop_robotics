@@ -23,20 +23,44 @@ inline int32_t buf2int32(uint8_t* buf) {
 
 namespace state {
   void serialize(uint8_t* buf, state_t* state) {
+    uint8_t* ptr = buf;
     for (int i = 0; i < NUM_J; i++) {
-      buf[i] = state->mask[i];
-      int32buf(buf + NUM_J + sizeof(int32_t)*i, state->pos[i]);
-      int16buf(buf + NUM_J + sizeof(int32_t)*NUM_J + sizeof(int16_t)*i, int16_t(state->vel[i]));
+      *ptr = state->mask[i];
+      ptr++;
+    }
+    for (int i = 0; i < NUM_J; i++) {
+      int32buf(ptr, state->pos[i]);
+      ptr += sizeof(int32_t);
+    }
+    for (int i = 0; i < NUM_J; i++) {
+      int16buf(ptr, state->vel[i]);
+      ptr += sizeof(int16_t);
+    }
+    for (int i = 0; i < NUM_J; i++) {
+      int16buf(ptr, state->enc[i]);
+      ptr += sizeof(int16_t);
     }
   }
 
   void deserialize(state_t* state, uint8_t* buf) {
+    uint8_t* ptr = buf;
     for (int i = 0; i < NUM_J; i++) {
-      state->mask[i] = buf[i];
-      state->pos[i] = buf2int32(buf + NUM_J + sizeof(int32_t)*i);
-      state->vel[i] = float(buf2int16(buf + NUM_J + sizeof(int32_t)*NUM_J + sizeof(int16_t)*i));
-      // printf("J%d %d %x %d %x -> %d\n", i, NUM_J + 2*i, buf[NUM_J + 2*i], NUM_J + 2*i+1, buf[NUM_J + 2*i+1], state->pos[i]);
+      state->mask[i] = *ptr;
+      ptr++;
     }
+    for (int i = 0; i < NUM_J; i++) {
+      state->pos[i] = buf2int32(ptr);
+      ptr += sizeof(int32_t);
+    }
+    for (int i = 0; i < NUM_J; i++) {
+      state->vel[i] = float(buf2int16(ptr));
+      ptr += sizeof(int16_t);
+    }
+    for (int i = 0; i < NUM_J; i++) {
+      state->enc[i] = buf2int16(ptr);
+      ptr += sizeof(int16_t);
+    }
+    // printf("J%d %d %x %d %x -> %d\n", i, NUM_J + 2*i, buf[NUM_J + 2*i], NUM_J + 2*i+1, buf[NUM_J + 2*i+1], state->pos[i]);
   }
 
   void apply_settings(settings_t* s, uint8_t* buf) {

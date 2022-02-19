@@ -43,7 +43,7 @@ void loop() {
     state::apply_settings(&state::settings, buf);
     state::print_settings(&state::settings);
   } else if (sz != 0) {
-    LOG_ERROR("sz %d", sz);
+    LOG_ERROR("ERR BADPACKET SZ %d", sz);
   }
   
   motion::read();
