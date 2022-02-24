@@ -322,10 +322,10 @@ void motion::write() {
 }
 
 void motion::read() {
+  // We always read encoders; whether or not we use the data is handled in 
+  // motion::write()
   for (int i = 0; i < NUM_J; i++) {
-    if (!(state::intent.mask[i] & MASK_OPEN_LOOP_CONTROL)) {
-      state::actual.pos[i] = hal::readEnc(i);
-    }
+    state::actual.enc[i] = hal::readEnc(i);
   }
 }
 

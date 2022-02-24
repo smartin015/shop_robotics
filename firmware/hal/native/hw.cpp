@@ -49,15 +49,25 @@ void loop() {
   sock.recv(resp);
 
   uint8_t* payload = ((uint8_t*)resp.data());
-  sim_millis = *((uint64_t*)payload); // 8 bytes clock in milliseconds
-  for (int i = 0; i < NUM_J; i++) {
-    // 5th byte is all limit switches in a mask
-    limit[i] = (bool) (*(payload+sizeof(uint64_t)) & (0x01 << i));
+  uint8_t* ptr = payload;
+  sim_millis = *((uint64_t*)ptr); // 64-bit clock in milliseconds
+  ptr += sizeof(uint64_t);
 
-    // Remaining data is encoders
-    encoder[i] = ((int32_t*)(payload+sizeof(uint64_t)+sizeof(uint8_t)))[i];
+  // next byte is all limit switches in a mask
+  uint8_t limit_mask = *ptr;  
+  ptr += sizeof(uint8_t);
+  for (int i = 0; i < NUM_J; i++) {
+    limit[i] = (bool) limit_mask & (0x01 << i);
+  }
+  
+  // Remaining data is encoders
+  for (int i = 0; i < NUM_J; i++) {
+    encoder[i] = *((int16_t*)ptr);
+    ptr += sizeof(int16_t);
   }
   // LOG_DEBUG("HW packet: %lu %d %d", millis(), limit[0], encoder[0]);
+
+  // Now construct the outgoing message to push step counts to the simulator
   zmq::message_t msg(NUM_J * sizeof(uint32_t));
   for (int i = 0; i < NUM_J; i++) {
     ((uint32_t*)msg.data())[i] = steps[i];

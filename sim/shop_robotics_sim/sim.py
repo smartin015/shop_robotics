@@ -201,10 +201,10 @@ class AR3(Node):
               if lim:
                 limit_mask |= (0b1 << i)
             pos = [s.getValue() for s in self.sensors] # TODO dedupe against joint_state_callback
-            steps = [ int(p / (2*3.14159) * STEPS_PER_REV[i]) for (i, p) in enumerate(pos) ]
+            enc = [ int(p / (2*3.14159) * ENCODER_TICKS_PER_REV[i]) for (i, p) in enumerate(pos) ]
             millis = int(now * 1000)
-            msg = struct.pack('<QB' + 'i'*NUM_J, millis, limit_mask, *steps)
-            self.hw_socket.send(msg) # send milliseconds over ZMQ and block for firmware to process
+            msg = struct.pack('<QB' + 'i'*NUM_J, millis, limit_mask, *enc)
+            self.hw_socket.send(msg) # send over ZMQ and block for firmware to process
             steps = self.hw_socket.recv()
             if steps:
               self.handle_raw_steps(steps)

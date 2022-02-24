@@ -106,35 +106,38 @@
         <tr>
           <th>Step/encoder</th>
           <th>Vel/accel</th>
-          <th>Mask</th>
-          <th>Step pos</th>
-          <th>Encoder</th>
-          <th>Target</th>
-          <th class="mdl-data-table__cell--non-numeric">Velocity</th>
-          <th>Value</th>
-          <th>Target (rad/s)</th>
+          <th>Step / Target</th>
+          <th>Encoder / Target</th>
+          <th>Velocity / Target</th>
         </tr>
       </thead>
       <tbody>
         <tr id="repeatntimes">
           <td>
             <canvas class="radCanvas" width="200" height="200">[No canvas support]</canvas>
+            <div class="mask"></div>
           </td>
           <td>
             <canvas class="linCanvas" width="500" height="200" style="width: 100%">[No canvas support]</canvas>
           </td>
-          <td class="mask"></td>
-          <td style="width:300px">
+          <!--<td style="width:300px">
             <input class="mdl-slider mdl-js-slider posslider" type="range" id="s6" min="-3.14159" max="3.14159" value="0" step="0.1">
+          </td>-->
+          <td>
+            <div class="posval">#</div>
+            <div class="postgt">#</div>
           </td>
-          <td class="posval">#</td>
-          <td class="encval">#</td>
-          <td class="postgt">0</td>
-          <td style="width:300px">
+          <td>
+            <div class="encval">#</div>
+            <div class="enctgt">#</div>
+          </td>
+          <td>
+            <div class="velval">#</div>
+            <div class="veltgt">#</div>
+          </td>
+          <!--<td style="width:300px">
             <input class="mdl-slider mdl-js-slider velslider" type="range" id="s6" min="-1.0" max="1.0" value="0.25" step="0.025">
-          </td>
-          <td class="veltgt">0</td>
-          <td class="velval">#</td>
+          </td>-->
         </tr>
       </tbody>
     </table>
@@ -389,7 +392,7 @@ function init(host_env) {
     lingraphCanvas: document.getElementsByClassName("linCanvas"),
     radgraph: Array(state.num_j).fill(null),
     lingraph: Array(state.num_j).fill(null),
-    velslider: document.getElementsByClassName("velslider"),
+    // velslider: document.getElementsByClassName("velslider"),
     veltgt: document.getElementsByClassName("veltgt"),
     velval: document.getElementsByClassName("velval"),
   };
@@ -412,10 +415,11 @@ function init(host_env) {
       inp.style = `background-color: ${INCLUSIVE_COLORS[i]}`;
     }
 
-    ui.velslider[i].oninput = (e) => {
-      state.tvel[i] = Math.round(e.target.value / (2*3.14159) * state.steps_per_rev[i]);
-      ui.veltgt[i].innerText = parseFloat(e.target.value).toFixed(2);
-    }
+    
+    //ui.velslider[i].oninput = (e) => {
+    //  state.tvel[i] = Math.round(e.target.value / (2*3.14159) * state.steps_per_rev[i]);
+    //  ui.veltgt[i].innerText = parseFloat(e.target.value).toFixed(2);
+    //}
   }
    
   document.getElementById("limit_override").onchange = (event) => setMaskAllJoints(MASK_LIMIT_TRIGGERED, event.target.checked);

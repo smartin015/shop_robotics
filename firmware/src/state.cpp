@@ -56,10 +56,15 @@ namespace state {
       state->vel[i] = float(buf2int16(ptr));
       ptr += sizeof(int16_t);
     }
-    for (int i = 0; i < NUM_J; i++) {
-      state->enc[i] = buf2int16(ptr);
-      ptr += sizeof(int16_t);
-    }
+
+    // Currently we throw away encoder data recieved upstream;
+    // later we may want to alert on it if it's substantially
+    // different than the actual encoder values we have, as this
+    // Could indicate timing skew or other weirdness.
+    //for (int i = 0; i < NUM_J; i++) {
+    //  state->enc[i] = buf2int16(ptr);
+    //  ptr += sizeof(int16_t);
+    //}
     // printf("J%d %d %x %d %x -> %d\n", i, NUM_J + 2*i, buf[NUM_J + 2*i], NUM_J + 2*i+1, buf[NUM_J + 2*i+1], state->pos[i]);
   }
 
