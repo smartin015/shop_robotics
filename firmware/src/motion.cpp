@@ -47,11 +47,15 @@ uint32_t steps_since_last_print = 0; // Cumulative, all joints
 uint32_t msgs_received_since_last_print = 0;
 
 uint64_t last_velocity_update = 0;
+
 float prev_vel[NUM_J];
+float err_vel[NUM_J];
 float prev_err_vel[NUM_J];
+
 int prev_pos[NUM_J];
 int err_pos[NUM_J];
-float err_vel[NUM_J];
+int prev_err_pos[NUM_J];
+
 float pid_updates[NUM_J][3];
 bool active[NUM_J];
 
@@ -206,28 +210,44 @@ bool motion::update() {
     
     prev_err_vel[i] = err_vel[i];
     err_vel[i] = state::intent.vel[i] - state::actual.vel[i];
+
+    prev_err_pos[i] = err_pos[i];
     err_pos[i] = state::intent.pos[i] - state::actual.pos[i];
 
     // Don't calculate stepping if we're already at intent
     active[i] = (ABS(err_vel[i]) > VEL_DEAD_ZONE) || (ABS(err_pos[i]) > POS_DEAD_ZONE);
     for (int i = 0; i < NUM_J; i++) {
-    	bool en = state::intent.mask[i] & MASK_ENABLED; 
-	// We *can* be enabled, but we may not *need* to be enabled.
-	hal::stepEnabled(i, en && active[i]);
+    	bool en = state::intent.mask[i] & (MASK_POS_ENABLED|MASK_VEL_ENABLED); 
+	    // We *can* be enabled, but we may not *need* to be enabled.
+    	hal::stepEnabled(i, en && active[i]);
     }
     if (!active[i]) {
       continue;
     }
     
-    // This is PID adjustment targeting velocity - in this case, P=velocity, I=position, D=acceleration
-    // Note that we have targets both for position and velocity, but not for acceleration - that's where
-    // we use a real value.
-    pid_updates[i][0] = state::settings.pid[0] * err_vel[i];
-    pid_updates[i][1] = state::settings.pid[1] * err_pos[i];
-    pid_updates[i][2] = state::settings.pid[2] * (err_vel[i] - prev_err_vel[i]);
-    if (pid_updates[i][0] > HARD_MAX_PID_CONTRIBUTION ||
-        pid_updates[i][1] > HARD_MAX_PID_CONTRIBUTION ||
-        pid_updates[i][2] > HARD_MAX_PID_CONTRIBUTION) {
+    bool pos_en = state::intent.mask[i] & MASK_POS_ENABLED;
+    bool vel_en = state::intent.mask[i] & MASK_VEL_ENABLED;
+    if (pos_en && vel_en) {
+      // This is PID adjustment targeting velocity - in this case, P=velocity, I=position, D=acceleration
+      // Note that we have targets both for position and velocity, but not for acceleration - that's where
+      // we use a real value.
+      pid_updates[i][0] = state::settings.pid[0] * err_vel[i];
+      pid_updates[i][1] = state::settings.pid[1] * err_pos[i];
+      pid_updates[i][2] = state::settings.pid[2] * (err_vel[i] - prev_err_vel[i]);
+    } else if (pos_en && !vel_en) {
+      // Position-only PID calculates P=position error, I=position error integral, D=pos error derivative
+      pid_updates[i][0] = state::settings.pid[0] * err_pos[i];
+      pid_updates[i][1] = state::settings.pid[1] * (err_pos[i] + prev_err_pos[i]);
+      pid_updates[i][2] = state::settings.pid[2] * (err_pos[i] - prev_err_pos[i]);
+    } else if (!pos_en && vel_en) {
+      // Velocity-only PID calculates P=velocity error, I=velocity error integral, D=vel error derivative
+      pid_updates[i][0] = state::settings.pid[0] * err_vel[i];
+      pid_updates[i][1] = state::settings.pid[1] * (err_vel[i] + prev_err_vel[i]);
+      pid_updates[i][2] = state::settings.pid[2] * (err_vel[i] - prev_err_vel[i]);
+    }
+    if (ABS(pid_updates[i][0]) > HARD_MAX_PID_CONTRIBUTION ||
+        ABS(pid_updates[i][1]) > HARD_MAX_PID_CONTRIBUTION ||
+        ABS(pid_updates[i][2]) > HARD_MAX_PID_CONTRIBUTION) {
       emergency_decel_triggered = true;
       LOG_ERROR("PID UPDATE %d %d %d CONTAINS AT LEAST 1 TERM ABOVE HARD LIMIT %d - EMERGENCY DECELERATION ENABLED", 
           int(pid_updates[i][0]), int(pid_updates[i][1]), int(pid_updates[i][2]), HARD_MAX_PID_CONTRIBUTION);
@@ -262,11 +282,14 @@ void motion::intent_changed() {
   recalc_limit_intent();
 
   for (int i = 0; i < NUM_J; i++) {
-    bool en = state::intent.mask[i] & MASK_ENABLED; 
+    bool en = state::intent.mask[i] & (MASK_POS_ENABLED|MASK_VEL_ENABLED); 
     // We *can* be enabled, but we may not *need* to be enabled.
     hal::stepEnabled(i, en && active[i]);
-    state::actual.mask[i] = (state::actual.mask[i] & ~MASK_ENABLED) | (en ? MASK_ENABLED : 0);
-  }
+    if (en) {
+      state::actual.mask[i] |= state::intent.mask[i] && (MASK_POS_ENABLED|MASK_VEL_ENABLED);
+    } else {
+      state::actual.mask[i] &= ~(MASK_POS_ENABLED|MASK_VEL_ENABLED);
+    }
 }
 
 // Note: this is likely called inside a timer interrupt
@@ -304,7 +327,7 @@ void motion::write() {
       ticks[i] = ticks_per_step[i];
       hal::stepDn(i);
       steps_since_last_print++;
-      if (state::intent.mask[i] & MASK_OPEN_LOOP_CONTROL) {
+      if (!(state::intent.mask[i] & MASK_ENCODER_ENABLED)) {
         state::actual.pos[i] += (step_vel[i] > 0) ? 1 : -1;
       }
     } else {

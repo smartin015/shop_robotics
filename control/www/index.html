@@ -56,9 +56,19 @@
   }
   table th {
     text-align: center !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  table td {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
   }
   table tr:hover {
     background-color: inherit !important;
+  }
+  .flexvert {
+    display: flex;
+    flex-direction: column;
   }
 
   label.is-checked > span.mdl-checkbox__label {
@@ -81,22 +91,7 @@
        <label class = "mdl-checkbox mdl-js-checkbox" for = "send_state">
           <input type = "checkbox" id = "send_state" 
              class = "mdl-checkbox__input">
-          <span class = "mdl-checkbox__label">send_state</span>
-       </label>
-       <label class = "mdl-checkbox mdl-js-checkbox" for = "joint_enable">
-          <input type = "checkbox" id = "joint_enable" 
-             class = "mdl-checkbox__input">
-          <span class = "mdl-checkbox__label">enable joints</span>
-       </label>
-       <label class = "mdl-checkbox mdl-js-checkbox" for = "open_loop">
-          <input type = "checkbox" id = "open_loop" 
-             class = "mdl-checkbox__input">
-          <span class = "mdl-checkbox__label">open loop</span>
-       </label>
-       <label class = "mdl-checkbox mdl-js-checkbox" for = "limit_override">
-          <input type = "checkbox" id = "limit_override" 
-             class = "mdl-checkbox__input">
-          <span class = "mdl-checkbox__label">limit override</span>
+          <span class = "mdl-checkbox__label">send state</span>
        </label>
       </div>
     </div>
@@ -104,15 +99,33 @@
     <table class="mdl-data-table mdl-js-data-table" style="background-color: transparent !important;">
       <thead>
         <tr>
-          <th>Step/encoder</th>
-          <th>Vel/accel</th>
-          <th>Step / Target</th>
-          <th>Encoder / Target</th>
-          <th>Velocity / Target</th>
+          <th>M</th>
+          <th>bot</th>
+          <th>Step / Encoder</th>
+          <th>Velocity / Acceleration</th>
+          <th>Step</th>
+          <th>Encoder</th>
+          <th>Velocity</th>
         </tr>
       </thead>
       <tbody>
         <tr id="repeatntimes">
+          <td>
+            <div class="flexvert">
+              <input title="Position Control" type="checkbox" class="mdl-checkbox__input pos_enable"/>
+              <input title="Velocity Control" type="checkbox" class="mdl-checkbox__input vel_enable"/>
+              <input title="Limit override" type="checkbox" class="mdl-checkbox__input limit_override"/>
+              <input title="Use Encoder" type="checkbox" class="mdl-checkbox__input enc_enable"/>
+            </div>
+          </td>
+          <td>
+            <div class="flexvert">
+              <input title="Position Enabled" type="checkbox" class="mdl-checkbox__input pos_enable_actual" disabled/>
+              <input title="Velocity Enabled" type="checkbox" class="mdl-checkbox__input vel_enable_actual" disabled/>
+              <input title="Limit triggered" type="checkbox" class="mdl-checkbox__input limit_trigger_actual" disabled/>
+              <input title="Using encoder" type="checkbox" class="mdl-checkbox__input enc_enable_actual" disabled/>
+            </div>
+          </td>
           <td>
             <canvas class="radCanvas" width="200" height="200">[No canvas support]</canvas>
             <div class="mask"></div>
@@ -166,9 +179,11 @@ var ws = null; //See reconnect()
 var state = null; //See init()
 var ui = null; //See init()
 
-const MASK_ENABLED = 0b1;
-const MASK_LIMIT_TRIGGERED = 0b10;
-const MASK_OPEN_LOOP_CONTROL = 0b100;
+// See firmware/src/state.h
+const MASK_POS_ENABLED = 0b1;
+const MASK_VEL_ENABLED = 0b10;
+const MASK_LIMIT_TRIGGERED = 0b100;
+const MASK_ENCODER_ENABLED = 0b1000;
 
 const GRAPH_DOMAIN_SEC = 20;
 const SEND_STATE_PD_MILLIS = 100;
@@ -205,12 +220,9 @@ function initGraph(id, nSeries, yMin, yMax, title, units) {
   }).draw();
 }
 
-function setMaskAllJoints(mask, enabled) {
-  console.log(`All joints: mask change ${mask}: ${enabled}`);
-  for (let i = 0; i < state.num_j; i++) {
-    state.tmask[i] = (state.tmask[i] & ~mask) | ((enabled) ? mask : 0);
-  }
-
+function setMask(joint, mask, enabled) {
+  console.log(`Joint ${joint}: mask change ${mask}: ${enabled}`);
+  state.tmask[joint] = (state.tmask[joint] & ~mask) | ((enabled) ? mask : 0);
 }
 
 function setStatus(status) {
@@ -277,6 +289,12 @@ function handleMessage(event) {
 
     for (let i = 0; i < state.num_j; i++) {
       state.mask[i]= view.getInt8(i, true);
+      ui.pos_enable_actual[i].checked = state.mask[i] & MASK_POS_ENABLED;
+      ui.vel_enable_actual[i].checked = state.mask[i] & MASK_VEL_ENABLED;
+      ui.limit_trigger_actual[i].checked = state.mask[i] & MASK_LIMIT_TRIGGERED;
+      ui.enc_enable_actual[i].checked = state.mask[i] & MASK_ENCODER_ENABLED;
+
+
       state.pos[i] = view.getInt32(state.num_j + 4*i, true);
       state.vel[i] = view.getInt16(5*state.num_j + 2*i, true);
       state.enc[i] = view.getInt16(7*state.num_j + 2*i, true);
@@ -395,13 +413,15 @@ function init(host_env) {
     // velslider: document.getElementsByClassName("velslider"),
     veltgt: document.getElementsByClassName("veltgt"),
     velval: document.getElementsByClassName("velval"),
+    pos_enable_actual: document.getElementsByClassName("pos_enable_actual"),
+    vel_enable_actual: document.getElementsByClassName("vel_enable_actual"),
+    limit_trigger_actual: document.getElementsByClassName("limit_trigger_actual"),
+    enc_enable_actual: document.getElementsByClassName("enc_enable_actual"),
   };
   console.log(ui);
 
 
   for (let i = 0; i < state.num_j; i++) {
-    console.log("Init polar chart", ui.radgraphCanvas[i]);
-    console.log("Init line chart", ui.lingraphCanvas[i]);
     ui.lingraphCanvas[i].id = "line"+i; // ID based graph creation required :(
     ui.radgraph[i] = new PolarChart(ui.radgraphCanvas[i], 100, 100, 100, 2, 80, INCLUSIVE_COLORS, (rad) => {
       state.tpos_norm[i] = rad;
@@ -421,12 +441,15 @@ function init(host_env) {
     //  ui.veltgt[i].innerText = parseFloat(e.target.value).toFixed(2);
     //}
   }
-   
-  document.getElementById("limit_override").onchange = (event) => setMaskAllJoints(MASK_LIMIT_TRIGGERED, event.target.checked);
-  document.getElementById("joint_enable").onchange = (event) => setMaskAllJoints(MASK_ENABLED, event.target.checked);
-  document.getElementById("open_loop").onchange = (event) => setMaskAllJoints(MASK_OPEN_LOOP_CONTROL, event.target.checked);
-  document.getElementById("send_state").onchange = (event) => state.send_state = event.target.checked;
   
+  for (let i = 0; i < state.num_j; i++) {
+    document.getElementsByClassName("pos_enable")[i].onchange =    (event) => setMask(i, MASK_POS_ENABLED, event.target.checked);
+    document.getElementsByClassName("vel_enable")[i].onchange =    (event) => setMask(i, MASK_VEL_ENABLED, event.target.checked);
+    document.getElementsByClassName("limit_override")[i].onchange = (event) => setMask(i, MASK_LIMIT_TRIGGERED, event.target.checked);
+    document.getElementsByClassName("enc_enable")[i].onchange =    (event) => setMask(i, MASK_ENCODER_ENABLED, event.target.checked);
+  }
+
+  document.getElementById("send_state").onchange = (event) => state.send_state = event.target.checked;
 	document.getElementById("fw_settings").onsubmit = (event) => pushSettings(event);
 
   startWebsocket();

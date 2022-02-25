@@ -6,18 +6,20 @@
 
 #include <stdint.h>
 
-// Enable the stepper motor driver for this joint
-#define MASK_ENABLED (0b1)
+// Enable position or velocity based commands to this joint
+// If either of these are set, enable the stepper motor driver for this joint
+#define MASK_POS_ENABLED (0b00000001)
+#define MASK_VEL_ENABLED (0b00000010)
 
 // For intent, this describes whether or not to ignore
 // the braking behavior when any limit is triggered.
 // For actual, this indicates a limit was triggered.
 // Note the arm will stop moving if any joint isn't matching
 // the intent.
-#define MASK_LIMIT_TRIGGERED (0b1 << 1)
+#define MASK_LIMIT_TRIGGERED (0b00000100)
 
-// When this flag is active, do not read encoders for position.
-#define MASK_OPEN_LOOP_CONTROL (0b1 << 2)
+// When this flag is active, match targets against encoder positions (not set implies open loop control)
+#define MASK_ENCODER_ENABLED (0b00001000)
 
 #define DEFAULT_MAX_ACCEL 40
 #define DEFAULT_INITIAL_SPD 10
