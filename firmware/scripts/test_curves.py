@@ -19,7 +19,11 @@ def sameData(aa, bb):
   return reduce(lambda x, y: x and y, [a == b for (a,b) in zip(aa[:-1], bb[:-1])])
 
 data_struct_fmt = "<BB" + "B"*NUM_J + "i"*NUM_J + "h"*NUM_J + "h"*NUM_J + "Q"
+queue_avail = 0
+stopping = False
 def read_forever():
+  global queue_avail
+  global stopping
   last = None
   while True:
     try:
@@ -30,6 +34,8 @@ def read_forever():
     if not sameData(last, data):
       print("Data: ", data)
     last = data
+    queue_avail = data[2]
+    stopping = data[1] != 0
 print("Starting read loop")
 threading.Thread(target=read_forever, daemon=True).start()
 
@@ -51,14 +57,15 @@ while True:
   msg = struct.pack('<QB' + 'i'*NUM_J, micros, limit_mask, *enc)
   sim.send(msg)
   packet = sim.recv()
-  if micros > next_report_micros:
-    steps = struct.unpack("<" + "i"*NUM_J, packet)
-    print(steps)
-    next_report_micros += REPORT_INTERVAL 
+  if queue_avail > 3 and not stopping:
     if writeab:
       print("write 1")
       send(joint_num=0, curve_id=1, shift_y=0, scale_y=10 * 256, length_usec=100*1000)
     else:
       print("write 2")
-      send(joint_num=0, curve_id=2, shift_y=0, scale_y=10 * 256, length_usec=100*1000)
+      send(joint_num=0, curve_id=2, shift_y=150, scale_y=10 * 256, length_usec=100*1000)
     writeab = not writeab
+  if micros > next_report_micros:
+    steps = struct.unpack("<" + "i"*NUM_J, packet)
+    print(steps)
+    next_report_micros += REPORT_INTERVAL 

@@ -12,7 +12,16 @@ struct intent_t {
   int16_t scale_y; // fixed-point integer multiplier (1 sign bit, 7 bit whole, 8 bit fractional)
   uint32_t length_usec;
 };
-bool push(const uint8_t j, const uint8_t *buf);
+#define STATUS_MSG_SZ 32
+struct status_t {
+  uint8_t code;
+  char message[STATUS_MSG_SZ];
+};
+#define PUSH_OK 0
+#define PUSH_ERR_INVALID 1
+#define PUSH_ERR_DISJOINT 2
+#define PUSH_ERR_FULL 3
+status_t push(const uint8_t j, const uint8_t *buf);
 const intent_t& get(const uint8_t j);
 bool pop(const uint8_t j);
 bool empty(const uint8_t j);

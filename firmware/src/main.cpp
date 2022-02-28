@@ -38,8 +38,9 @@ void loop() {
   if (sz == INTENT_PACKET_SZ + sizeof(uint8_t)) {
     if (!motion::decelerating()) {
       uint8_t j = buf[0];
-      if (!intent::push(j, (buf+1))) {
-        LOG_ERROR("ERR joint %d disjoint or full, triggering e-stop", j);
+      auto status = intent::push(j, (buf+1));
+      if (status.code != PUSH_OK) {
+        LOG_ERROR("PUSH ERR %d: %s", status.code, status.message);
         motion::decelerate();
       }
     }
