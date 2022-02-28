@@ -7,7 +7,7 @@ services:
     tty: true
     network_mode: host
     working_dir: /volume
-    entrypoint: ["bash", "-c", "pio run -e native && .pio/build/native/program"]
+    # entrypoint: ["bash", "-c", "pio run -e native && .pio/build/native/program"]
     volumes:
       - ".:/volume"
       - "./.pio:/root/.pio"
