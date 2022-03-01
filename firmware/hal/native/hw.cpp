@@ -6,26 +6,48 @@
 #include <zmq.hpp>
 #include <chrono>
 
-#define PUB_PD_MILLIS 100
-uint64_t sim_millis = 0;
+uint64_t target_micros = 0;
+uint64_t sim_micros = 0;
 uint64_t millis() {
-  return sim_millis;
+  return sim_micros / 1000;
 }
-
-// No need to delay in native environment (non-realtime OS, makes us miss our tick freq deadline)
-void delayMicroseconds(uint16_t us) {}
+uint64_t micros() {
+  return sim_micros;
+}
 
 namespace hw {
 
+int16_t rate[NUM_J];
 bool limit[NUM_J];
-int32_t steps[NUM_J];
+int64_t usteps[NUM_J];
 int16_t encoder[NUM_J];
 
-bool get_limit(int idx) { return limit[idx]; }
-int get_encoder(int idx) { return encoder[idx]; }
+bool advance(uint16_t usec) { 
+  if (sim_micros+usec > target_micros) {
+    return false;
+  }
+  sim_micros += usec; 
+  for (int j = 0; j < NUM_J; j++) {
+    // uSteps = (step/sec) * (ustep/step) * (sec/usec) * (usec)  
+    // = (step/sec) * (1000000) * (1/1000000) * (usec)
+    usteps[j] += rate[j] * usec;
+    
+    //if (j == 0) {LOG_DEBUG("advance %d %d -> %d", rate[j], usec, get_steps(j));}
+  }
+  return true;
+}
+bool get_limit(uint8_t j) { 
+  return limit[j]; 
+}
+int32_t get_steps(uint8_t j) { 
+  return usteps[j] / 1000000; 
+}
+int16_t get_encoder(uint8_t j) { 
+  return encoder[j]; 
+}
 
-void move_steps(int idx, int delta) { 
-  steps[idx] += delta; 
+void set_rate(uint8_t j, int16_t r) { 
+  rate[j] = r; 
 }
 
 // Single socket handles bidirectional syncing between simulation and firmware
@@ -39,7 +61,8 @@ void init() {
   LOG_DEBUG("HW: REP: %s", SOCKET_ADDR); 
   sock.connect(SOCKET_ADDR);
   for (int i = 0; i < NUM_J; i++) {
-    steps[i] = 0;
+    rate[i] = 0;
+    usteps[i] = 0;
     limit[i] = true;
   }
 }
@@ -50,7 +73,7 @@ void loop() {
 
   uint8_t* payload = ((uint8_t*)resp.data());
   uint8_t* ptr = payload;
-  sim_millis = *((uint64_t*)ptr); // 64-bit clock in milliseconds
+  target_micros = *((uint64_t*)ptr); // 64-bit clock in microseconds
   ptr += sizeof(uint64_t);
 
   // next byte is all limit switches in a mask
@@ -68,11 +91,11 @@ void loop() {
   // LOG_DEBUG("HW packet: %lu %d %d", millis(), limit[0], encoder[0]);
 
   // Now construct the outgoing message to push step counts to the simulator
-  zmq::message_t msg(NUM_J * sizeof(uint32_t));
+  zmq::message_t msg(NUM_J * sizeof(int32_t));
   for (int i = 0; i < NUM_J; i++) {
-    ((uint32_t*)msg.data())[i] = steps[i];
+    ((int32_t*)msg.data())[i] = get_steps(i);
   }
-  sock.send(msg);  
+  sock.send(msg, zmq::send_flags::none);  
 }
 
 } // namespace hw

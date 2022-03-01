@@ -7,13 +7,10 @@
 namespace hal {
 
 void init();
-void stepDir(int i, bool dir);
-void stepDn(int i);
-void stepUp(int i);
-void stepEnabled(int i, bool en);
-bool readLimit(int i);
-int readEnc(int idx);
-void writeEnc(int idx, int value);
+bool readLimit(uint8_t j);
+void setStepRate(uint8_t j, int16_t rate);
+int16_t readEnc(uint8_t j);
+int32_t readSteps(uint8_t j);
 void startMainTimer(int hz, void(*cb)());
 void disableInterrupts();
 void enableInterrupts();

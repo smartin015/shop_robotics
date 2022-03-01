@@ -1,4 +1,4 @@
-#include "app_hal.h"
+#include "hal.h"
 #include "hw.h"
 #include "log.h"
 #include <signal.h>
@@ -9,11 +9,10 @@
 
 // The amount of time we expect a full loop of the firmware to take,
 // on an embedded controller.
-#define SIMULATED_LOOP_TIME_MILLIS 2
+#define SIMULATED_LOOP_TIME_USEC 100
 
 int cur_dir[NUM_J];
 bool prev_step_pin[NUM_J];
-int step_offs[NUM_J];
 
 // For some reason, Ctrl+C isn't detected when
 // running the native program via `pio` in Docker,
@@ -29,31 +28,19 @@ void init() {
   // Nothing to do here; no hardware to initialize
 }
 
-void stepDir(int i, bool dir) {
-  cur_dir[i] = (dir) ? 1 : -1;
-}
-void stepDn(int i) {
-  if (prev_step_pin[i]) {
-    hw::move_steps(i, cur_dir[i]);
-  }
-  prev_step_pin[i] = false;
-}
-void stepUp(int i) {
-  prev_step_pin[i] = true;
-}
-void stepEnabled(int i, bool en) {}
-
-bool readLimit(int i) {
-  return hw::get_limit(i);
+bool readLimit(uint8_t j) {
+  return hw::get_limit(j);
 }
 
-int readEnc(int idx) {
-  return hw::get_encoder(idx) + step_offs[idx];
+int16_t readEnc(uint8_t j) {
+  return hw::get_encoder(j);
+}
+int32_t readSteps(uint8_t j) {
+  return hw::get_steps(j);
 }
 
-void writeEnc(int idx, int value) {
-  step_offs[idx] = value - hw::get_encoder(idx);
-  LOG_DEBUG("Wrote %d to encoder %d", value, idx);
+void setStepRate(uint8_t j, int16_t rate) {
+  return hw::set_rate(j, rate);
 }
 
 void disableInterrupts() {}
@@ -94,16 +81,15 @@ int main() {
   hw::init();
   for (int i = 0; i < NUM_J; i++) {
     cur_dir[i] = 1;
-    step_offs[i] = 0;
     prev_step_pin[i] = true;
   }
   setup();
-  uint64_t loop_time = 0;
   while (1) {
-    hw::loop(); // Hidden hardware emulation; includes setting millis() to sim clock
-    while (loop_time < millis()) {
+    // Hidden hardware emulation; includes setting micros() to sim clock
+    // Returns false when we've overrun the simulator clock
+    hw::loop(); 
+    while (hw::advance(SIMULATED_LOOP_TIME_USEC)) {
       loop();
-      loop_time += SIMULATED_LOOP_TIME_MILLIS;
     }
   }
 }

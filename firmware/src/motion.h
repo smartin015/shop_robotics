@@ -1,19 +1,16 @@
-#ifndef FUNCTIONS_H
-#define FUNCTIONS_H
-
-#define LIMIT_CHECK_TICK_PD 200
+#ifndef MOTION_H
+#define MOTION_H
 
 namespace motion {
 
-void init();
+#define MOTION_MSG_SZ (2*sizeof(uint8_t) + NUM_J*(sizeof(uint8_t) + sizeof(int32_t) + sizeof(int16_t) + sizeof(int16_t)))
+
 void write();
 void read();
-void zero();
-bool update();
-void intent_changed();
-void print_state();
-void print_pid_stats();
+void serialize(uint8_t* buf);
+void decelerate();
+bool decelerating();
 
 } // namespace motion
 
-#endif // FUNCTIONS_H
+#endif // MOTION_H

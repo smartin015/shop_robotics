@@ -1,8 +1,10 @@
 #include "log.h"
-#include "app_hal.h"
+#include "hal.h"
 #include "comms.h"
 #include "motion.h"
-#include "state.h"
+#include "pid.h"
+#include "settings.h"
+#include "intent.h"
 
 #include <unistd.h>
 #include <stdio.h>
@@ -12,46 +14,47 @@ void setup() {
   comms::init(); // Init comms first; may be needed to safely log outputs
 
   LOG_INFO("Setup begin for %d joint robot (report every %dms)", NUM_J, REPORT_PD_MILLIS);
-  motion::init();
   hal::init();
+  pid::reset();
+  intent::reset();
+
+  // TODO configure limit switch interrupts
 
   LOG_INFO("Configuring main timing loop for %d hz", MOTION_WRITE_HZ);
   hal::startMainTimer(MOTION_WRITE_HZ, &motion::write);
 
   LOG_INFO("Printing firmware settings:");
-  state::print_settings(&state::settings);
+  // TODO
 
   LOG_INFO("Setup complete");
 }
 
-uint64_t last_report = 0;
 uint8_t buf[128];
 void loop() {
-  uint64_t now = millis();
-  if (now > last_report + REPORT_PD_MILLIS) {
-    last_report = now;
-    motion::print_state();
-  }
-
   // NOTE: Casting directly to struct requires both the same endianness and same interpetation of floating point
-  // nubmers. https://stackoverflow.com/questions/13775893/converting-struct-to-byte-and-back-to-struct
+  // numbers. (see https://stackoverflow.com/questions/13775893/converting-struct-to-byte-and-back-to-struct)
+  // Explicit deserialization prevents unexpected errors in data format.
   int sz = comms::read(buf, sizeof(buf));
-  if (sz == MOTION_MSG_SZ) {
-    state::deserialize(&state::intent, buf);
-    motion::intent_changed();
-  } else if (sz == SETTINGS_MSG_SZ) {
-    state::apply_settings(&state::settings, buf);
-    state::print_settings(&state::settings);
+  if (sz == INTENT_PACKET_SZ + sizeof(uint8_t)) {
+    if (!motion::decelerating()) {
+      uint8_t j = buf[0];
+      auto status = intent::push(j, (buf+1));
+      if (status.code != PUSH_OK) {
+        LOG_ERROR("PUSH ERR %d: %s", status.code, status.message);
+        motion::decelerate();
+      }
+    }
   } else if (sz != 0) {
-    LOG_ERROR("ERR BADPACKET SZ %d", sz);
+    LOG_ERROR("ERR BADPACKET SZ %d - WANT %d", sz, INTENT_PACKET_SZ+sizeof(uint8_t));
   }
   
   motion::read();
+  motion::write();
 
-  if (motion::update()) {
-    // LOG_INFO("SI0 %x %d %d SA0 %x %d %d", state::intent.mask[0], state::intent.pos[0], state::intent.vel[0], state::actual.mask[0], state::actual.pos[0], state::actual.vel[0]);
-    state::serialize(buf, &state::actual);
-    comms::write(buf, MOTION_MSG_SZ);
-    // motion::print_pid_stats();
+  if (comms::available()) {
+    motion::serialize(buf);
+    // Also add the current micros so we can check for sync
+    *((uint64_t*) (buf + MOTION_MSG_SZ)) = micros();
+    comms::write(buf, MOTION_MSG_SZ + sizeof(uint64_t));
   }
 }
