@@ -65,11 +65,6 @@ void runSteps(int hz, void(*cb)()) {
   }
 }
 
-std::thread t;
-void startMainTimer(int hz, void(*cb)()) {
-  t = std::thread(runSteps, hz, cb);
-};
-
 } // namespace hal
 
 

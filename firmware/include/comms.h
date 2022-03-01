@@ -6,9 +6,10 @@
 namespace comms {
 
 void init();
-int read(uint8_t* buf, int buflen);
-void write(uint8_t* buf, int buflen);
-bool available();
+uint8_t * read(uint8_t* sz);
+void finishRead();
+uint8_t * preWrite(uint8_t sz);
+void flush(uint8_t sz);
 void printf(const char* format, ...);
 
 } // namespace comms

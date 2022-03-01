@@ -21,7 +21,7 @@ struct status_t {
 #define PUSH_ERR_INVALID 1
 #define PUSH_ERR_DISJOINT 2
 #define PUSH_ERR_FULL 3
-status_t push(const uint8_t j, const uint8_t *buf);
+status_t push(const uint8_t j, const uint8_t *buf, uint8_t sz);
 const intent_t& get(const uint8_t j);
 bool pop(const uint8_t j);
 bool empty(const uint8_t j);

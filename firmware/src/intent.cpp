@@ -32,12 +32,16 @@ bool empty(uint8_t j) {
   return !num[j];
 }
 
-status_t push(uint8_t j, const uint8_t *buf) {
-  if (j > NUM_J) {
+status_t push(uint8_t j, const uint8_t *buf, uint8_t sz) {
+  if (sz != INTENT_PACKET_SZ) {   
+    status_t err = {PUSH_ERR_INVALID, ""};
+    snprintf(err.message, STATUS_MSG_SZ, "bad sz %d; want %d", sz, INTENT_PACKET_SZ);
+    return err;
+  } else if (j > NUM_J) {
     return status_t{PUSH_ERR_INVALID, "invalid joint"};
   } else if (num[j] == INTENT_BUFSZ) {
     return status_t{PUSH_ERR_FULL, "intent queue full"};
-  }
+  } 
   auto* dest = &(ring[j][(idx[j]+num[j]) % INTENT_BUFSZ]);
   deserialize(dest, buf);
   if (dest->curve_id >= NCURVES) {

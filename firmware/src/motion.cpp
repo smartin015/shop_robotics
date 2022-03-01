@@ -25,7 +25,7 @@ uint32_t curve_start_usec = 0;
 
 void motion::decelerate() {
   motion_mask = 1;
-  curve_start_usec = micros();
+  curve_start_usec = hal::micros();
   for (int i = 0; i < NUM_J; i++) {
     decel_vel_start[i] = vel[i];
   }
@@ -38,7 +38,7 @@ bool motion::decelerating() {
 // so care must be taken to keep overall cycles light.
 // Logging and other debugging calls are prohibited.
 void motion::write() {
-  uint32_t now = micros(); // note: truncated from uint64
+  uint32_t now = hal::micros(); // note: truncated from uint64
   if (decelerating()) {
     uint32_t dt_usec = now - curve_start_usec;
     uint32_t velsum = 0;

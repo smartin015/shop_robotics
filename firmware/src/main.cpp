@@ -20,41 +20,49 @@ void setup() {
 
   // TODO configure limit switch interrupts
 
-  LOG_INFO("Configuring main timing loop for %d hz", MOTION_WRITE_HZ);
-  hal::startMainTimer(MOTION_WRITE_HZ, &motion::write);
-
   LOG_INFO("Printing firmware settings:");
   // TODO
 
   LOG_INFO("Setup complete");
 }
 
-uint8_t buf[128];
+#define MOTION_LOOP_PD_MICROS 10000
+uint32_t next_motion_update = 0;
 void loop() {
   // NOTE: Casting directly to struct requires both the same endianness and same interpetation of floating point
   // numbers. (see https://stackoverflow.com/questions/13775893/converting-struct-to-byte-and-back-to-struct)
   // Explicit deserialization prevents unexpected errors in data format.
-  int sz = comms::read(buf, sizeof(buf));
-  if (sz == INTENT_PACKET_SZ + sizeof(uint8_t)) {
+  uint8_t sz = 0;
+  uint8_t* bufptr;
+  intent::status_t status;
+  if ((bufptr = comms::read(&sz)) != NULL) {
     if (!motion::decelerating()) {
-      uint8_t j = buf[0];
-      auto status = intent::push(j, (buf+1));
-      if (status.code != PUSH_OK) {
-        LOG_ERROR("PUSH ERR %d: %s", status.code, status.message);
-        motion::decelerate();
-      }
+      uint8_t j = bufptr[0];
+      status = intent::push(j, (bufptr+1), sz-1);
     }
-  } else if (sz != 0) {
-    LOG_ERROR("ERR BADPACKET SZ %d - WANT %d", sz, INTENT_PACKET_SZ+sizeof(uint8_t));
+    comms::finishRead();
+  }
+
+  if (bufptr != NULL && status.code != PUSH_OK) {
+    LOG_ERROR("PUSH ERR %d: %s", status.code, status.message);
+    motion::decelerate();
   }
   
-  motion::read();
-  motion::write();
+  uint32_t now = hal::micros();
+  if (next_motion_update < UINT32_MAX && now > UINT32_MAX) {
+    // Handle overflow period
+    return;
+  } else if (now > next_motion_update) {
+    motion::read();
+    motion::write();
 
-  if (comms::available()) {
-    motion::serialize(buf);
-    // Also add the current micros so we can check for sync
-    *((uint64_t*) (buf + MOTION_MSG_SZ)) = micros();
-    comms::write(buf, MOTION_MSG_SZ + sizeof(uint64_t));
+    uint8_t *wbuf = comms::preWrite(MOTION_MSG_SZ + sizeof(uint64_t));
+    if (wbuf != NULL) {
+      motion::serialize(wbuf);
+      // Also add the current micros so we can check for sync
+      *((uint32_t*) (wbuf + MOTION_MSG_SZ)) = hal::micros();
+      comms::flush(MOTION_MSG_SZ + sizeof(uint64_t));
+    }
+    next_motion_update = now + MOTION_LOOP_PD_MICROS;
   }
 }
