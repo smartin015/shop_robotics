@@ -16,6 +16,14 @@ const uint16_t DIR_PINS[] = {GPIO_PIN_0, GPIO_PIN_1, GPIO_PIN_3, GPIO_PIN_4, GPI
 #define LIMIT_PORT GPIOE
 const uint16_t LIMIT_PINS[] = {GPIO_PIN_7, GPIO_PIN_8, GPIO_PIN_9, GPIO_PIN_10, GPIO_PIN_11, GPIO_PIN_12};
 
+// See https://microcontrollerslab.com/led-blinking-tutorial-stm32f4-discovery-board-gpio-hal-library/
+#define LED_PORT GPIOD
+// On error, light LD5 (PD14) = red
+#define ERR_PIN GPIO_PIN_14
+// On successful init, light LD4 (PD12) = greem
+#define SUC_PIN GPIO_PIN_12
+// On data transfer, light LD6 (PD15) - blue
+#define XFER_PIN GPIO_PIN_15
 
 UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart5;
@@ -34,6 +42,7 @@ static void MX_UART5_Init(void);
 
 void Error_Handler(void) {
   __disable_irq();
+  HAL_GPIO_WritePin(ERR_PORT, ERR_PIN, GPIO_PIN_SET);
   while (1) {}
 }
 
@@ -60,6 +69,7 @@ void init() {
   
   // UART5 is command uart. Don't enable logging input for now.
   HAL_UART_Receive_IT (&huart5, uart5_recv_buf[buf_write_idx], UART5_FRAGMENT_LEN);
+  //HAL_GPIO_WritePin(SUC_PORT, SUC_PIN, GPIO_PIN_SET);
 }
 
 void set_dir_and_pwm(uint8_t j, int16_t hz) {
@@ -130,6 +140,7 @@ uint8_t* uart_recv(uint8_t* sz) {
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+  HAL_GPIO_WritePin(LED_PORT, XFER_PIN, GPIO_PIN_TOGGLE);
   uint8_t c;
   uint8_t* buf = uart5_recv_buf[buf_write_idx];
   uint8_t* i = &(idx[buf_write_idx]);
@@ -644,6 +655,7 @@ static void MX_UART5_Init(void)
 
 }
 
+
 /**
   * @brief GPIO Initialization Function
   * @param None
@@ -661,12 +673,22 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOE, GPIO_PIN_7|GPIO_PIN_8|GPIO_PIN_9|GPIO_PIN_10
                           |GPIO_PIN_11|GPIO_PIN_12, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_3|GPIO_PIN_4
-                          |GPIO_PIN_5|GPIO_PIN_6, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14|GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_3
+                          |GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : PA3 */
+  GPIO_InitStruct.Pin = GPIO_PIN_3;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pins : PE7 PE8 PE9 PE10
                            PE11 PE12 */
@@ -677,10 +699,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PD0 PD1 PD3 PD4
-                           PD5 PD6 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_3|GPIO_PIN_4
-                          |GPIO_PIN_5|GPIO_PIN_6;
+  /*Configure GPIO pins : PD14 PD0 PD1 PD3
+                           PD4 PD5 PD6 */
+  GPIO_InitStruct.Pin = GPIO_PIN_14|GPIO_PIN_12|GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_3
+                          |GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
