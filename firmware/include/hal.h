@@ -1,9 +1,6 @@
 #ifndef __APP_HAL_H__
 #define __APP_HAL_H__
 
-// Device-specific constants and includes go in a hw.h file in `hal/<arch>/
-#include "hw.h"
-
 namespace hal {
 
 uint32_t micros();
