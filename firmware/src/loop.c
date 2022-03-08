@@ -11,12 +11,12 @@
 #include <stdlib.h>
 
 void setup() {
-  comms::init(); // Init comms first; may be needed to safely log outputs
+  comms_init(); // Init comms first; may be needed to safely log outputs
 
   LOG_INFO("Setup begin for %d joint robot (report every %dms)", NUM_J, REPORT_PD_MILLIS);
-  hal::init();
-  pid::reset();
-  intent::reset();
+  hal_init();
+  pid_reset();
+  intent_reset();
 
   // TODO configure limit switch interrupts
 
@@ -34,34 +34,34 @@ void loop() {
   // Explicit deserialization prevents unexpected errors in data format.
   uint8_t sz = 0;
   uint8_t* bufptr;
-  intent::status_t status;
-  if ((bufptr = comms::read(&sz)) != NULL) {
-    if (!motion::decelerating()) {
+  struct intent_status_t status;
+  if ((bufptr = comms_read(&sz)) != NULL) {
+    if (!motion_decelerating()) {
       uint8_t j = bufptr[0];
-      status = intent::push(j, (bufptr+1), sz-1);
+      status = intent_push(j, (bufptr+1), sz-1);
     }
-    comms::finishRead();
+    comms_finishRead();
   }
 
   if (bufptr != NULL && status.code != PUSH_OK) {
     LOG_ERROR("PUSH ERR %d: %s", status.code, status.message);
-    motion::decelerate();
+    motion_decelerate();
   }
   
-  uint32_t now = hal::micros();
+  uint32_t now = hal_micros();
   if (next_motion_update < UINT32_MAX && now > UINT32_MAX) {
     // Handle overflow period
     return;
   } else if (now > next_motion_update) {
-    motion::read();
-    motion::write();
+    motion_read();
+    motion_write();
 
-    uint8_t *wbuf = comms::preWrite(MOTION_MSG_SZ + sizeof(uint64_t));
+    uint8_t *wbuf = comms_preWrite(MOTION_MSG_SZ + sizeof(uint64_t));
     if (wbuf != NULL) {
-      motion::serialize(wbuf);
+      motion_serialize(wbuf);
       // Also add the current micros so we can check for sync
-      *((uint32_t*) (wbuf + MOTION_MSG_SZ)) = hal::micros();
-      comms::flush(MOTION_MSG_SZ + sizeof(uint64_t));
+      *((uint32_t*) (wbuf + MOTION_MSG_SZ)) = hal_micros();
+      comms_flush(MOTION_MSG_SZ + sizeof(uint64_t));
     }
     next_motion_update = now + MOTION_LOOP_PD_MICROS;
   }

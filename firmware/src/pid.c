@@ -1,11 +1,12 @@
 /* Motion planner for AR3 robotic arm
  *
- * motion::write() frequently updates stepper rates to meet
+ * motion_write() frequently updates stepper rates to meet
  * the trajectory.
  */
 #include "log.h"
 #include "hal.h"
 #include "pid.h"
+#include <stdbool.h>
 
 #define ABS(v) ((v > 0) ? v : -v)
 #define MIN(a,b) ((a<b) ? a : b)
@@ -32,7 +33,7 @@ bool active[NUM_J];
 const uint16_t steps_per_rev[NUM_J] = STEPS_PER_REV;
 const uint16_t encoder_usec_per_rev[NUM_J] = ENCODER_TICKS_PER_REV;
 
-void pid::reset() {
+void pid_reset() {
   for (int i = 0; i < NUM_J; i++) {
     prev_pos[i] = 0;
     prev_vel[i] = 0;
@@ -45,7 +46,7 @@ void pid::reset() {
   }
 }
 
-bool pid::update(int16_t* dest, uint8_t j, int16_t pos, int16_t pos_target, int16_t vel_target) {
+bool pid_update(int16_t* dest, uint8_t j, int16_t pos, int16_t pos_target, int16_t vel_target) {
   // NOTE: starting with just a PI controller since we only have an encoder as real input - taking a discrete second derivative 
   // could be quite noisy.
   // TODO tweak dest by applying PID to pos, vel, enc

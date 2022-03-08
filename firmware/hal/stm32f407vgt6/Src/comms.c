@@ -10,33 +10,33 @@ int16_t readlen = 0;
 
 #define PACKET_START_BYTE 0x02
 
-void comms::init() {}
+void comms_init() {}
 
-uint8_t* comms::read(uint8_t* sz) {
-  return hw::uart_recv(sz);
+uint8_t* comms_read(uint8_t* sz) {
+  return hw_uart_recv(sz);
 }
-void comms::finishRead() {
-  return hw::uart_flip_buffer();
+void comms_finishRead() {
+  return hw_uart_flip_buffer();
 } 
 
-uint8_t* comms::preWrite(uint8_t sz) {
-  if (hw::uart_busy(/*logging =*/ false)) {
+uint8_t* comms_preWrite(uint8_t sz) {
+  if (hw_uart_busy(/*logging =*/ false)) {
     return 0;
   }
-   uint8_t* ptr = hw::uart_get_write_buffer(/*logging =*/ false);
+   uint8_t* ptr = hw_uart_get_write_buffer(/*logging =*/ false);
   (*ptr++) = PACKET_START_BYTE;
   (*ptr++) = sz;
   return ptr;
 }
 
-void comms::flush(uint8_t sz) {
-  if (!hw::uart_send(sz, /*logging =*/ false)) {
-    comms::printf("SNDFAIL (sz %d)", sz);
+void comms_flush(uint8_t sz) {
+  if (!hw_uart_send(sz, /*logging =*/ false)) {
+    comms_printf("SNDFAIL (sz %d)", sz);
   }
 }
 
 static uint8_t pfbuf[BUFLEN];
-void comms::printf(const char* format, ...) {
+void comms_printf(const char* format, ...) {
   va_list argptr;
   va_start(argptr, format);
   char *ptr = (char*) pfbuf;
@@ -44,8 +44,8 @@ void comms::printf(const char* format, ...) {
   (*ptr++) = PACKET_START_BYTE;
   vsnprintf(ptr, sizeof(pfbuf)-2, format, argptr);
   va_end(argptr);
-  if (!hw::uart_busy(/*logging =*/true)) {
-    hw::uart_send(BUFLEN, /*logging =*/ true);
+  if (!hw_uart_busy(/*logging =*/true)) {
+    hw_uart_send(BUFLEN, /*logging =*/ true);
   }
 }
 

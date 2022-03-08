@@ -3,15 +3,11 @@
 
 #include <stdint.h>
 
-namespace comms {
-
-void init();
-uint8_t * read(uint8_t* sz);
-void finishRead();
-uint8_t * preWrite(uint8_t sz);
-void flush(uint8_t sz);
-void printf(const char* format, ...);
-
-} // namespace comms
+void comms_init();
+uint8_t * comms_read(uint8_t* sz);
+void comms_finishRead();
+uint8_t * comms_preWrite(uint8_t sz);
+void comms_flush(uint8_t sz);
+void comms_printf(const char* format, ...);
 
 #endif // COMMS_H
