@@ -36,6 +36,18 @@ void on_message(uint8_t* bufptr, uint8_t sz) {
   }
 }
 
+// This is called via ISR() in STM32; logging and other blocking operations are prohibited
+void on_limits_changed() {
+  uint8_t lim = hal_readLimits();
+  if (lim != 0) {
+    //LOG_ERROR("LIMIT ENGAGED: mask %x", next);
+    motion_decelerate();
+  } else {
+    //LOG_INFO("Limits disengaged; resuming motion");
+    motion_resume();
+  }
+}
+
 #define MOTION_LOOP_PD_MICROS 10000
 uint32_t next_motion_update = 0;
 void loop() {

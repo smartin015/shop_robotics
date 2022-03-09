@@ -16,7 +16,7 @@ uint32_t hw_micros() {
 }
 
 int16_t rate[NUM_J];
-uint8_t limit[NUM_J];
+uint8_t hw_limit;
 int64_t usteps[NUM_J];
 int16_t encoder[NUM_J];
 
@@ -34,8 +34,8 @@ bool hw_advance(uint16_t usec) {
   }
   return true;
 }
-uint8_t hw_get_limit(uint8_t j) { 
-  return limit[j]; 
+uint8_t hw_get_limits() { 
+  return hw_limit; 
 }
 int32_t hw_get_steps(uint8_t j) { 
   return usteps[j] / 1000000; 
@@ -68,7 +68,7 @@ void hw_init() {
   for (int i = 0; i < NUM_J; i++) {
     rate[i] = 0;
     usteps[i] = 0;
-    limit[i] = true;
+    hw_limit = 0;
   }
 }
 
@@ -100,12 +100,13 @@ void sync_hw() {
   ptr += sizeof(uint32_t);
 
   // next byte is all limit switches in a mask
-  uint8_t limit_mask = *ptr;  
+  uint8_t new_hw_limit = *ptr;  
   ptr += sizeof(uint8_t);
-  for (int i = 0; i < NUM_J; i++) {
-    limit[i] = (bool) limit_mask & (0x01 << i);
+  if (new_hw_limit != hw_limit) {
+    hw_limit = new_hw_limit;
+    on_limits_changed();
   }
-  
+
   // Remaining data is encoders
   for (int i = 0; i < NUM_J; i++) {
     encoder[i] = *((int16_t*)ptr);

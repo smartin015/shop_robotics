@@ -5,7 +5,7 @@
 
 uint32_t hal_micros();
 void hal_init();
-uint8_t hal_readLimit(uint8_t j);
+uint8_t hal_readLimits();
 void hal_setStepRate(uint8_t j, int16_t rate);
 int16_t hal_readEnc(uint8_t j);
 int32_t hal_readSteps(uint8_t j);

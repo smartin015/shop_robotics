@@ -27,6 +27,7 @@
 
 #include  <errno.h> // Used in _write
 #include  <sys/unistd.h> // STDOUT_FILENO, STDERR_FILENO
+#include "hw.h"
 #include "log.h"
 #include "intent.h"
 #include "comms.h"
@@ -94,40 +95,33 @@ int _write(int file, char *data, int len) {
 
 
 #define DIR_PORT GPIOD
-const uint16_t DIR_PINS[] = {GPIO_PIN_0, GPIO_PIN_1, GPIO_PIN_3, GPIO_PIN_4, GPIO_PIN_5, GPIO_PIN_6};
+const uint16_t DIR_PINS[] = {DIR_J1_Pin,  DIR_J2_Pin, DIR_J3_Pin, DIR_J4_Pin, DIR_J5_Pin, DIR_J6_Pin};
 #define LIMIT_PORT GPIOE
-const uint16_t LIMIT_PINS[] = {GPIO_PIN_7, GPIO_PIN_8, GPIO_PIN_9, GPIO_PIN_10, GPIO_PIN_11, GPIO_PIN_12};
+const uint16_t LIMIT_PINS[] = {LIM_J1_Pin, LIM_J2_Pin, LIM_J3_Pin, LIM_J4_Pin, LIM_J5_Pin, LIM_J6_Pin};
 
 // See https://microcontrollerslab.com/led-blinking-tutorial-stm32f4-discovery-board-gpio-hal-library/
 #define LED_PORT GPIOD
-// On error, light LD5 (PD14) = red
-#define ERR_PIN GPIO_PIN_14
-// On successful init, light LD4 (PD12) = greem
-// WARNING: PD12 conflicts with TIM4 CH1
-//#define SUC_PIN GPIO_PIN_12
-// On data transfer, light LD6 (PD15) - blue
-#define XFER_PIN GPIO_PIN_15
 
 void hw_set_dir_and_pwm(uint8_t j, int16_t hz) {
   TIM_HandleTypeDef tmr;
   switch(j) {
     case 0:
-      tmr = htim3;
+      tmr = htim3; // PWM_J1_Pin
       break;
     case 1:
-      tmr = htim4;
+      tmr = htim4; // PWM_J2_Pin
       break;
     case 2:
-      tmr = htim10;
+      tmr = htim10; // PWM_J3_Pin
       break;
     case 3:
-      tmr = htim11;
+      tmr = htim11; // PWM_J4_Pin
       break;
     case 4:
-      tmr = htim13;
+      tmr = htim13; // PWM_J5_Pin
       break;
     case 5:
-      tmr = htim14;
+      tmr = htim14; // PWM_J6_Pin
       break;
     default:
       return;
@@ -187,7 +181,7 @@ void uart3_listen() {
 static int ncallbacks = 0;
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
   ncallbacks++;
-  HAL_GPIO_TogglePin(LED_PORT, XFER_PIN);
+  HAL_GPIO_TogglePin(LED_PORT, BLUE_LED_Pin);
   uint8_t c;
   for (int f = 0; f < UART3_FRAGMENT_LEN; f++) {
     c = uart3_fragment_buf[f];
@@ -221,8 +215,90 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
   uart3_listen();
 }
 
-bool hw_limit_read(uint8_t j) {
-  return HAL_GPIO_ReadPin(LIMIT_PORT, LIMIT_PINS[j]) != GPIO_PIN_RESET;
+// See https://electronics.stackexchange.com/a/99949
+/*
+ *               CW --->
+ * A (IRQ  )  ¯|___|¯¯¯¯|___|¯¯¯¯
+ * Interrupts  ^   ^    ^   ^
+ * B (IRQ   ) ¯¯¯|___|¯¯¯¯¯|___|¯
+ * Interrupts    ^   ^     ^   ^
+                  CCW <---
+ */
+const int8_t encoder_add_sub[] = {
+		 0, // 00 -> 00, no-op
+		 1, // 00 -> 01, forwards
+		-1, // 00 -> 10, backwards
+		 0, // 00 -> 11, illegal (2x transition)
+		-1, // 01 -> 00, backwards
+		 0, // 01 -> 01, no-op
+		 0, // 01 -> 10, illegal (2x transition)
+		 1, // 01 -> 11, forwards
+		 1, // 10 -> 00, forwards
+		 0, // 10 -> 01, illegal (2x transition)
+		 0, // 10 -> 10, no-op
+		-1, // 10 -> 11, backwards
+		 0, // 11 -> 00, illegal (2x transition)
+		-1, // 11 -> 01, backwards
+		 1, // 11 -> 10, forwards
+		 0, // 11 -> 11, no-op
+};
+uint16_t encoder_pos[NUM_J];
+uint8_t encoder_idx[NUM_J];
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+	uint8_t j = 0;
+	uint16_t data = LIMIT_PORT->ODR;
+	uint16_t pin1;
+	uint16_t pin2;
+	switch (GPIO_Pin) {
+	case ENC_J1A_Pin:
+	case ENC_J1B_Pin:
+		j = 0; pin1 = ENC_J1A_Pin; pin2 = ENC_J1B_Pin;
+		break;
+	case ENC_J2A_Pin:
+	case ENC_J2B_Pin:
+		j = 1; pin1 = ENC_J2A_Pin; pin2 = ENC_J2B_Pin;
+		break;
+	case ENC_J3A_Pin:
+	case ENC_J3B_Pin:
+		j = 2; pin1 = ENC_J3A_Pin; pin2 = ENC_J3B_Pin;
+		break;
+	case ENC_J4A_Pin:
+	case ENC_J4B_Pin:
+		j = 3; pin1 = ENC_J4A_Pin; pin2 = ENC_J4B_Pin;
+		break;
+	case ENC_J5A_Pin:
+	case ENC_J5B_Pin:
+		j = 4; pin1 = ENC_J5A_Pin; pin2 = ENC_J5B_Pin;
+		break;
+	case ENC_J6A_Pin:
+	case ENC_J6B_Pin:
+		j = 5; pin1 = ENC_J6A_Pin; pin2 = ENC_J6B_Pin;
+		break;
+	default:
+		return;
+	}
+	encoder_idx[j] = ((encoder_idx[j]<<2) & 0x0F) + ((!!(data & pin1)) << 1) + (!!(data & pin2));
+	encoder_pos[j]= encoder_pos[j]+encoder_add_sub[encoder_idx[j]];
+}
+uint16_t hw_enc_read(uint8_t j) {
+	return encoder_pos[j];
+}
+
+uint8_t hw_limits_read() {
+  uint16_t data = LIMIT_PORT->ODR;
+  uint8_t result = 0;
+  for (int j = 0; j < NUM_J; j++) {
+	  result |= (!!(data & LIMIT_PINS[j])) << j;
+  }
+  return result;
+}
+
+uint8_t last_limit = 0;
+void check_limits() {
+	uint8_t limits = hw_limits_read();
+	if (limits != last_limit) {
+		on_limits_changed();
+	}
 }
 
 // Note that the micros value is NOT uint64_t - overflows every ~71 minutes
@@ -295,6 +371,7 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1) {
+	check_limits();
 	loop();
     /* USER CODE END WHILE */
 
@@ -783,62 +860,75 @@ static void MX_GPIO_Init(void)
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOE_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOD, YELLOW_LED_Pin|RED_LED_Pin|BLUE_LED_Pin|DIR_J1_Pin
+                          |DIR_J2_Pin|DIR_J3_Pin|DIR_J4_Pin|DIR_J5_Pin
+                          |DIR_J6_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOE, GPIO_PIN_7|GPIO_PIN_8|GPIO_PIN_9|GPIO_PIN_10
-                          |GPIO_PIN_11|GPIO_PIN_12, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13|GPIO_PIN_14|GPIO_PIN_15|GPIO_PIN_0
-                          |GPIO_PIN_1|GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5
-                          |GPIO_PIN_6, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin : PA3 */
-  GPIO_InitStruct.Pin = GPIO_PIN_3;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  /*Configure GPIO pins : ENC_J2A_Pin ENC_J2B_Pin ENC_J3A_Pin ENC_J3B_Pin
+                           ENC_J4A_Pin ENC_J1A_Pin ENC_J1B_Pin */
+  GPIO_InitStruct.Pin = ENC_J2A_Pin|ENC_J2B_Pin|ENC_J3A_Pin|ENC_J3B_Pin
+                          |ENC_J4A_Pin|ENC_J1A_Pin|ENC_J1B_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : PE7 PE8 PE9 PE10
-                           PE11 */
-  GPIO_InitStruct.Pin = GPIO_PIN_7|GPIO_PIN_8|GPIO_PIN_9|GPIO_PIN_10
-                          |GPIO_PIN_11;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : PE12 */
-  GPIO_InitStruct.Pin = GPIO_PIN_12;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  /*Configure GPIO pins : LIM_J1_Pin LIM_J2_Pin LIM_J3_Pin LIM_J4_Pin
+                           LIM_J5_Pin LIM_J6_Pin */
+  GPIO_InitStruct.Pin = LIM_J1_Pin|LIM_J2_Pin|LIM_J3_Pin|LIM_J4_Pin
+                          |LIM_J5_Pin|LIM_J6_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : ENC_J4B_Pin ENC_J5A_Pin ENC_J5B_Pin ENC_J6A_Pin
+                           ENC_J6B_Pin */
+  GPIO_InitStruct.Pin = ENC_J4B_Pin|ENC_J5A_Pin|ENC_J5B_Pin|ENC_J6A_Pin
+                          |ENC_J6B_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PD13 PD14 PD15 */
-  GPIO_InitStruct.Pin = GPIO_PIN_13|GPIO_PIN_14|GPIO_PIN_15;
+  /*Configure GPIO pins : YELLOW_LED_Pin RED_LED_Pin BLUE_LED_Pin */
+  GPIO_InitStruct.Pin = YELLOW_LED_Pin|RED_LED_Pin|BLUE_LED_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PD0 PD1 PD3 PD4
-                           PD5 PD6 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_3|GPIO_PIN_4
-                          |GPIO_PIN_5|GPIO_PIN_6;
+  /*Configure GPIO pins : DIR_J1_Pin DIR_J2_Pin DIR_J3_Pin DIR_J4_Pin
+                           DIR_J5_Pin DIR_J6_Pin */
+  GPIO_InitStruct.Pin = DIR_J1_Pin|DIR_J2_Pin|DIR_J3_Pin|DIR_J4_Pin
+                          |DIR_J5_Pin|DIR_J6_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI1_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI1_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI2_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI2_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI3_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI3_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI4_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI4_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
 }
 
@@ -853,6 +943,7 @@ static void MX_GPIO_Init(void)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
+  HAL_GPIO_TogglePin(LED_PORT, RED_LED_Pin);
   /* User can add his own implementation to report the HAL error return state */
   __disable_irq();
   while (1)

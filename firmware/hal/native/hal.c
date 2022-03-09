@@ -24,8 +24,8 @@ void hal_init() {
   // Nothing to do here; no hardware to initialize
 }
 
-uint8_t hal_readLimit(uint8_t j) {
-  return hw_get_limit(j);
+uint8_t hal_readLimits() {
+  return hw_get_limits();
 }
 
 int16_t hal_readEnc(uint8_t j) {

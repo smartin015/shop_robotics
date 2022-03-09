@@ -17,7 +17,6 @@
 #define MAX(a,b) ((a<b) ? b : a)
 
 uint8_t motion_mask = 0;
-uint8_t limit_mask = 0;
 int32_t pos[NUM_J];
 int16_t enc[NUM_J];
 int16_t vel[NUM_J];
@@ -33,6 +32,11 @@ void motion_decelerate() {
 }
 bool motion_decelerating() {
   return (motion_mask == 1);
+}
+
+void motion_resume() {
+  intent_reset();
+  motion_mask = 0;
 }
 
 // Note: this is likely called inside a timer interrupt
@@ -51,12 +55,9 @@ void motion_write() {
         vel[i] = MIN(0, decel_vel_start[i] + decel_amt);
       }
       velsum += ABS(vel[i]);
+      hal_setStepRate(i, vel[i]);
     }
     // LOG_DEBUG("ST %d RT %d DT %d -> VEL %d", decel_vel_start[0], settings_DECEL_RATE[0], dt_usec, vel[0]);
-    if (!velsum) { // We've stopped
-      intent_reset();
-      motion_mask = 0;
-    }
     return;
   }
 
@@ -102,7 +103,7 @@ void motion_read() {
 
 void motion_serialize(uint8_t* buf) {
   uint8_t* ptr = buf;
-  *(ptr++) = limit_mask;
+  *(ptr++) = hal_readLimits();
   *(ptr++) = motion_mask;
   for (int i = 0; i < NUM_J; i++) {
     *(ptr++) = intent_free(i);

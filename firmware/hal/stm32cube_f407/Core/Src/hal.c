@@ -41,11 +41,11 @@ void hal_setStepRate(uint8_t j, int16_t rate) {
   hw_set_dir_and_pwm(j, rate);
 }
 
-uint8_t hal_readLimit(uint8_t j) {
-  return hw_limit_read(j);
+uint8_t hal_readLimits() {
+  return hw_limits_read();
 }
-int16_t hal_readEnc(uint8_t i) {
-  return 0; // TODO
+int16_t hal_readEnc(uint8_t j) {
+  return hw_enc_read(j);
 }
 int32_t hal_readSteps(uint8_t j) {
   syncSteps(); 

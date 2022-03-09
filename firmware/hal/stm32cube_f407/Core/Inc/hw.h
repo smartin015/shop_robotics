@@ -41,9 +41,14 @@
 #define MAX_FREQ 2400
 // (PSC+1)*(ARR+1) = TIMclk/Updatefrequency
 
+// To be implemented in src/loop.c
+void on_message(uint8_t * buf, uint8_t sz);
+void on_limits_changed();
+
 void hw_init();
 void hw_set_dir_and_pwm(uint8_t j, int16_t hz);
-bool hw_limit_read(uint8_t j);
+uint8_t hw_limits_read();
+uint16_t hw_enc_read(uint8_t j);
 
 bool hw_uart_busy();
 uint8_t* hw_uart_get_write_buffer();

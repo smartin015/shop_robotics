@@ -10,5 +10,6 @@ void motion_read();
 void motion_serialize(uint8_t* buf);
 void motion_decelerate();
 bool motion_decelerating();
+void motion_resume();
 
 #endif // MOTION_H
