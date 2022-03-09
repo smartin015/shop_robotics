@@ -1,0 +1,7 @@
+hal.c:10:10:hal_micros	8	static
+hal.c:14:6:hal_init	16	static
+hal.c:23:6:syncSteps	32	static
+hal.c:38:6:hal_setStepRate	16	static
+hal.c:44:9:hal_readLimit	16	static
+hal.c:47:9:hal_readEnc	16	static
+hal.c:50:9:hal_readSteps	16	static

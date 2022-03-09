@@ -20,7 +20,7 @@ struct intent_status_t {
 #define PUSH_ERR_INVALID 1
 #define PUSH_ERR_DISJOINT 2
 #define PUSH_ERR_FULL 3
-struct intent_status_t intent_push(const uint8_t j, const uint8_t *buf, uint8_t sz);
+void intent_push(const uint8_t j, const uint8_t *buf, uint8_t sz, struct intent_status_t * err);
 const struct intent_intent_t* intent_get(const uint8_t j);
 bool intent_pop(const uint8_t j);
 bool intent_empty(const uint8_t j);

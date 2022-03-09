@@ -22,11 +22,11 @@
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
-#include "hw.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "hw.h"
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -68,28 +68,9 @@ const uint16_t LIMIT_PINS[] = {GPIO_PIN_7, GPIO_PIN_8, GPIO_PIN_9, GPIO_PIN_10, 
 #define XFER_PIN GPIO_PIN_15
 
 #define BUFLEN 128
-#define UART5_FRAGMENT_LEN 1
+#define UART3_FRAGMENT_LEN 1
 uint8_t uart3_recv_buf[2][BUFLEN];
 uint8_t buf_write_idx = 0;
-
-void hw_init() {
-  HAL_GPIO_WritePin(LED_PORT, ERR_PIN, GPIO_PIN_SET);
-
-  HAL_GPIO_WritePin(LED_PORT, ERR_PIN, GPIO_PIN_RESET);
-  
-  // UART5 is command uart. Don't enable logging input for now.
-  //HAL_UART_Receive_IT (&huart3, uart3_recv_buf[buf_write_idx], UART5_FRAGMENT_LEN);
-  uint8_t buf[] = "hello ";
-  //HAL_GPIO_WritePin(LED_PORT, ERR_PIN, GPIO_PIN_RESET);
-  // HAL_UART_Receive(&huart3, buf, 1, 1000);  // receive 4 bytes of data
-  while(1) {  
-    HAL_GPIO_TogglePin(LED_PORT, XFER_PIN);
-    HAL_UART_Transmit(&huart3, buf, sizeof(buf), 10);
-  }
-
-  // Start our microsecond counter
-  HAL_TIM_Base_Start(&htim2); 
-}
 
 void hw_set_dir_and_pwm(uint8_t j, int16_t hz) {
   TIM_HandleTypeDef tmr;
@@ -164,7 +145,7 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
 
 #define PACKET_START_BYTE 0x02
 uint8_t buf_read_idx = 0;
-uint8_t uart3_fragment_buf[UART5_FRAGMENT_LEN];
+uint8_t uart3_fragment_buf[UART3_FRAGMENT_LEN];
 uint8_t hw_idx[2] = {0,0};
 uint8_t hw_readlen[2] = {0,0};
 bool hw_uart_data_ready() {
@@ -197,7 +178,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
   uint8_t* buf = uart3_recv_buf[buf_write_idx];
   uint8_t* i = &(hw_idx[buf_write_idx]);
   uint8_t* r = &(hw_readlen[buf_write_idx]);
-  for (int f = 0; f < UART5_FRAGMENT_LEN; f++) {
+  for (int f = 0; f < UART3_FRAGMENT_LEN; f++) {
     c = uart3_fragment_buf[f];
     if (c == PACKET_START_BYTE) {
       // Magic byte, next byte is length
@@ -227,7 +208,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
       // TODO overrun warning indicator
     }
   }
-  HAL_UART_Receive_IT(&huart3, uart3_recv_buf[buf_write_idx], UART5_FRAGMENT_LEN); 
+  HAL_UART_Receive_IT(&huart3, uart3_recv_buf[buf_write_idx], UART3_FRAGMENT_LEN); 
 }
 
 bool hw_limit_read(uint8_t j) {
@@ -252,6 +233,8 @@ void loop();
   * @brief  The application entry point.
   * @retval int
   */
+
+uint8_t Test2[128]; //Data to send
 int main(void)
 {
   /* USER CODE BEGIN 1 */
@@ -286,28 +269,36 @@ int main(void)
   MX_TIM2_Init();
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
+  
+  // Start our microsecond counter
+  HAL_TIM_Base_Start(&htim2); 
   setup();
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    loop();
+    //loop();
 
-    /*
-    uint8_t Test[] = "Hello "; //Data to send
+
+    /*    
+    uint8_t Test[] = "Beep "; //Data to send
     HAL_UART_Receive (&huart3, Test,sizeof(Test), 1000);  // receive 4 bytes of data
     if(HAL_UART_Transmit(&huart3,Test,sizeof(Test),100) != HAL_OK) {
     Error_Handler();
     }
-
-    uint8_t Test2[] = "Bye  "; //Data to send
-    HAL_UART_Receive (&huart4, Test2,sizeof(Test2), 1000);  // receive 4 bytes of data
-    if(HAL_UART_Transmit(&huart4,Test2,sizeof(Test2),100) != HAL_OK) {
-    Error_Handler();
-    }
     */
+
+    uint32_t val = 200;
+    sprintf((char*)Test2, "%lu\n", val);
+    // HAL_UART_Receive (&huart4, Test2,sizeof(Test2), 1000);  // receive 4 bytes of data
+    if(HAL_UART_Transmit(&huart4,Test2,sizeof(Test2),100) != HAL_OK) {
+      Error_Handler();
+    }
+    HAL_Delay(1000);
+    
 
     /* USER CODE END WHILE */
 

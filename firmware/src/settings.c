@@ -1,6 +1,9 @@
 #include "settings.h"
 #include <stdint.h>
 
+// STM32 implementatoin sets the constant initializers in hw.h
+#include "hw.h"
+
 const int32_t settings_MIN_POS[NUM_J]=JOINT_MIN_POS;
 const int32_t settings_MAX_POS[NUM_J]=JOINT_MAX_POS;
 const int16_t settings_MIN_VEL[NUM_J]=JOINT_MIN_VEL;

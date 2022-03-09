@@ -3,9 +3,8 @@
 
 #include <stdint.h>
 
-void comms_init();
-uint8_t * comms_read(uint8_t* sz);
-void comms_finishRead();
+#define PACKET_START_BYTE 0xaa
+
 uint8_t * comms_preWrite(uint8_t sz);
 void comms_flush(uint8_t sz);
 void comms_printf(const char* format, ...);

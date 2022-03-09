@@ -3,25 +3,23 @@
 
 #include <unistd.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #define HIGH true
 #define LOW false
 
-void delayMicroseconds(uint16_t us);
-uint64_t millis();
-uint64_t micros();
+void on_message(uint8_t *buf, uint8_t sz);
 
-namespace hw {
-  bool get_limit(uint8_t j);
-  int32_t get_steps(uint8_t j);
-  int16_t get_encoder(uint8_t j);
+uint32_t hw_micros();
 
-  void set_rate(uint8_t j, int16_t rate);
-  
-  void init();
-  void loop();
-  bool advance(uint16_t usec);
+uint8_t hw_get_limit(uint8_t j);
+int32_t hw_get_steps(uint8_t j);
+int16_t hw_get_encoder(uint8_t j);
 
-} // namespace hw
+void hw_set_rate(uint8_t j, int16_t rate);
+
+void hw_init();
+void hw_loop();
+bool hw_advance(uint16_t usec);
 
 #endif

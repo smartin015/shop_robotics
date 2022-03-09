@@ -1,0 +1,5 @@
+motion.c:27:6:motion_decelerate	16	static
+motion.c:34:6:motion_decelerating	4	static
+motion.c:41:6:motion_write	56	static
+motion.c:96:6:motion_read	16	static
+motion.c:103:6:motion_serialize	48	static

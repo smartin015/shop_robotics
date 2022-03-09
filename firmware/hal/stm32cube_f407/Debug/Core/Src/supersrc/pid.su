@@ -1,0 +1,2 @@
+pid.c:37:6:pid_reset	16	static
+pid.c:50:6:pid_update	24	static

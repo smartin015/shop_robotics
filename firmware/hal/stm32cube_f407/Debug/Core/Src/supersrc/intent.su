@@ -1,0 +1,7 @@
+intent.c:14:6:intent_reset	16	static
+intent.c:24:6:intent_deserialize	16	static
+intent.c:31:6:intent_empty	16	static
+intent.c:35:6:intent_push	56	static
+intent.c:74:31:intent_get	16	static
+intent.c:77:6:intent_pop	16	static
+intent.c:86:9:intent_free	16	static

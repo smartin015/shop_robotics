@@ -6,6 +6,7 @@
 #include "log.h"
 #include "hal.h"
 #include "pid.h"
+#include "settings.h"
 #include <stdbool.h>
 
 #define ABS(v) ((v > 0) ? v : -v)

@@ -2,7 +2,6 @@
 #define __LOGGER_H__
 
 #include <stdio.h>
-#include <string.h>
 #include "comms.h"
 
 #define ERROR_LEVEL     0x01
@@ -14,7 +13,7 @@
 #endif
 
 #define PRINTFUNCTION(...)      printf(__VA_ARGS__)
-#define NEWLINE     "\n"
+#define NEWLINE     "\r\n"
 
 #if LOG_LEVEL >= DEBUG_LEVEL
 #define LOG_DEBUG(message, args...)     PRINTFUNCTION("D:" message NEWLINE, ## args)

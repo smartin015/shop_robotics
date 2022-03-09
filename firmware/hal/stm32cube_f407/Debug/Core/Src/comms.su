@@ -1,0 +1,4 @@
+comms.c:7:10:comms_read	16	static
+comms.c:11:6:comms_finishRead	8	static
+comms.c:15:10:comms_preWrite	24	static
+comms.c:25:6:comms_flush	16	static
