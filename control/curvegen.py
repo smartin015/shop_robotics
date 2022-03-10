@@ -83,7 +83,7 @@ def match_curve(A0, J, T, stats=True):
 
 def convert_profile(prof):
     # Return a NUM_J-element list of [[j0c1, j0c2...], [j1c1, j1c2...], ..., [jNc1, j1c2...]]
-    # where each j#c# = (curve_id, vel_shift, usec)
+    # where each j#c# = (curve_id, vel_scale, vel_shift, time)
     result = [[]] * NUM_J
     for joint_num, p in enumerate(prof):
       if joint_num != 0:
@@ -94,9 +94,18 @@ def convert_profile(prof):
 
         curve_id, vel_scale = match_curve(p.a[i], p.j[i], p.t[i])
         vel_shift = p.v[i]
-        usec = int(p.t[i] * 1000000) # originally in fractional seconds
-        result[joint_num].append((curve_id, vel_scale, vel_shift, usec))
+        time_sec = p.t[i]
+        result[joint_num].append((curve_id, vel_scale, vel_shift, time_sec))
     return result
+
+VEL_SCALE=10922 # Amount scaled in curves.c
+def encode_normalized(curve_id, vel_scale, vel_shift, time_sec):
+  return (
+    curve_id,
+    int((vel_scale / VEL_SCALE) * (2**16)), # 16-bit fixed point, 16-bit decimal
+    int(vel_shift * (2**8)), # 16-bit fixed point, 8-bit decimal
+    int(time_sec*1000000),
+  )
 
 if __name__ == '__main__':
     inp = InputParameter(NUM_J)
@@ -120,7 +129,11 @@ if __name__ == '__main__':
     if result == Result.ErrorInvalidInput:
         raise Exception('Invalid input!')
     print_trajectory(trajectory)
-    intents = convert_profile(trajectory.profiles[0])
+    norm = convert_profile(trajectory.profiles[0])
+    print("Joint 0 normalized:")
+    for curve in norm[0]:
+        print(str(curve) + ",")
+    intents = [[encode_normalized(*n) for n in nn] for nn in norm]
     print("Joint 0 intents:")
     for curve in intents[0]:
         print(str(curve) + ",")
