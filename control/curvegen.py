@@ -32,7 +32,7 @@ MIN_AT = -3 #MIN_V / NSAMP
 MAX_A0 = MAX_AT
 MIN_A0 = 0
 
-NUM_A0 = 31 
+NUM_A0 = 39 
 NUM_AT = 2*NUM_A0+1
 
 def match_curve(A0, J, T, stats=True):

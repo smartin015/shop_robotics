@@ -1,4 +1,0 @@
-loop.c:13:6:setup	8	static
-loop.c:26:6:on_message	56	static
-loop.c:40:6:on_limits_changed	16	static
-loop.c:53:6:loop	24	static
