@@ -1,3 +1,6 @@
 [submodule "control/ruckig"]
 	path = control/ruckig
 	url = https://github.com/pantor/ruckig.git
+[submodule "control/inputs/ruckig"]
+	path = control/inputs/ruckig
+	url = https://github.com/pantor/ruckig

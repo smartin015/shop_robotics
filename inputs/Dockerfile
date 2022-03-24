@@ -6,8 +6,8 @@ RUN apt-get update \
   && pip3 install websockets paho-mqtt pyzmq pyserial \
   && rm -rf /var/lib/apt/lists*
 
-ARG ROS2PKG=shop_robotics_control
-ARG ROS2NODES="control"
+ENV ROS2PKG=shop_robotics_control
+ENV ROS2NODES="driver"
 COPY . /$ROS2PKG
 WORKDIR /$ROS2PKG
 # Switch to using bash as shell so ROS binaries are in $PATH
