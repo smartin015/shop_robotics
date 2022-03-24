@@ -40,6 +40,10 @@ void write(uint8_t* buf, int buflen) {
   push.send(reply, zmq::send_flags::dontwait);
 }
 
+bool available() {
+  return true; // TODO
+}
+
 void printf(const char* format, ...) {
 
 }
