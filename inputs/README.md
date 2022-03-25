@@ -16,11 +16,14 @@ Can view broker display at `<ip>:8000`
 Build Ruckig with python bindings and some internal members exposed (the latter allows for accessing e.g. `trajectory.profiles`)
 
 ```
+git submodule update
+
+cd ruckig/
 git submodule init --recursive
 pip install "pybind11[global]"
 cd control/ruckig 
 mkdir -p build && cd build 
-cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_PYTHON_MODULE=1 -DEXPOSE_INTERNAL ..
+cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_PYTHON_MODULE=1 -DEXPOSE_INTERNAL=1 ..
 make
 ```
 

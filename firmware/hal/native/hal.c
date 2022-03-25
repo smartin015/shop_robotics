@@ -48,12 +48,14 @@ void loop();
 int main() {
   signal(SIGINT, signal_callback_handler);
   signal(SIGTERM, signal_callback_handler);
+  printf("Init\n");
   hw_init();
   for (int i = 0; i < NUM_J; i++) {
     cur_dir[i] = 1;
     prev_step_pin[i] = true;
   }
   setup();
+  printf("Beginning main loop\n");
   while (1) {
     // Hidden hardware emulation; includes setting micros() to sim clock
     // Returns false when we've overrun the simulator clock

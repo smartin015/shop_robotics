@@ -7,7 +7,7 @@
 
 #define ZMQ_PULL_ADDR "tcp://0.0.0.0:5559"
 #define ZMQ_PUSH_ADDR "tcp://0.0.0.0:5558"
-#define ZMQ_REP_ADDR "ipc:///tmp/shop_robotics_hw.ipc"
+#define ZMQ_REQ_ADDR "ipc:///tmp/shop_robotics_hw.ipc"
 
 uint32_t target_micros = 0;
 uint32_t sim_micros = 0;
@@ -49,7 +49,7 @@ void hw_set_rate(uint8_t j, int16_t r) {
 }
 
 // Single socket handles bidirectional syncing between simulation and firmware
-zsock_t *sock;
+zsock_t *sim_socket;
 
 // Push and pull sockets to emulate UART communications
 zsock_t *push;
@@ -61,10 +61,10 @@ void hw_init() {
   zsock_set_linger(push, linger);
   pull = zsock_new_pull(ZMQ_PULL_ADDR);
   zsock_set_linger(pull, linger);
-  sock = zsock_new_rep(ZMQ_REP_ADDR);
-  assert(sock);
-  zsock_set_linger(sock, linger);
-  printf("Comms initialized (PUSH %s PULL %s REP %s)\n", ZMQ_PUSH_ADDR, ZMQ_PULL_ADDR, ZMQ_REP_ADDR);
+  sim_socket = zsock_new_req(ZMQ_REQ_ADDR);
+  assert(sim_socket);
+  //zsock_set_linger(sim_socket, linger);
+  printf("Comms initialized (PUSH %s PULL %s REP %s)\n", ZMQ_PUSH_ADDR, ZMQ_PULL_ADDR, ZMQ_REQ_ADDR);
   for (int i = 0; i < NUM_J; i++) {
     rate[i] = 0;
     usteps[i] = 0;
@@ -89,7 +89,19 @@ void check_comms() {
 }
 
 void sync_hw() {
-  zframe_t *resp = zframe_recv(sock);
+  // Construct the outgoing message to push step counts to the simulator
+  zframe_t *msg = zframe_new(NULL, NUM_J * sizeof(int32_t));
+  for (int i = 0; i < NUM_J; i++) {
+    ((int32_t*)zframe_data(msg))[i] = hw_get_steps(i);
+  }
+  int rc = zframe_send(&msg, sim_socket, 0); //consumes msg
+  if (rc != 0) {
+    printf("HWLOOP SEND ERR %d\n", errno);
+    assert(rc == 0);
+  }
+
+  // Receive the simulation state
+  zframe_t *resp = zframe_recv(sim_socket);
   if (resp == NULL) {
     printf("HWLOOP RECV ERR %d\n", errno);
     assert(resp != NULL);
@@ -114,17 +126,6 @@ void sync_hw() {
   }
   // LOG_DEBUG("HW packet: %lu %d %d", millis(), limit[0], encoder[0]);
   zframe_destroy(&resp);
-
-  // Now construct the outgoing message to push step counts to the simulator
-  zframe_t *msg = zframe_new(NULL, NUM_J * sizeof(int32_t));
-  for (int i = 0; i < NUM_J; i++) {
-    ((int32_t*)zframe_data(msg))[i] = hw_get_steps(i);
-  }
-  int rc = zframe_send(&msg, sock, 0); //consumes msg
-  if (rc != 0) {
-    printf("HWLOOP SEND ERR %d\n", errno);
-    assert(rc == 0);
-  }
 
 }
 

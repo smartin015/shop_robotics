@@ -152,11 +152,11 @@ class AR3(Node):
         SOCKET_ADDR = self.get_parameter('sock_addr').get_parameter_value().string_value
         self.zmq_context = zmq.Context()
 
-        self.hw_socket = self.zmq_context.socket(zmq.REQ)
-        self.hw_socket.bind(SOCKET_ADDR)
-        os.chmod("/tmp/shop_robotics_hw.ipc", 0o777)
+        self.hw_socket = self.zmq_context.socket(zmq.REP)
+        self.hw_socket.bind(SOCKET_ADDR) #Matches default paradigm in zsock_new_rep
+        os.chmod(SOCKET_ADDR.replace("ipc://",""), 0o777)
         self.hw_socket.setsockopt(zmq.LINGER, 0) 
-        self.get_logger().info(f"HW: REQ: {SOCKET_ADDR}")
+        self.get_logger().info(f"HW: REP: {SOCKET_ADDR}")
 
         self.executor = rclpy.executors.MultiThreadedExecutor()
         self._default_callback_group = rclpy.callback_groups.ReentrantCallbackGroup()
@@ -192,9 +192,10 @@ class AR3(Node):
             if now > next_joint_state_cb:
               self.joint_state_callback()
               next_joint_state_cb = next_joint_state_cb + self.JOINT_STATE_PD
-            #if now > next_dance_cb:
-            #  self.dance_callback()
-            #  next_dance_cb = next_dance_cb + self.DANCE_PD
+
+            steps = self.hw_socket.recv()
+            if steps:
+              self.handle_raw_steps(steps)
 
             limit_mask = 0b0
             for (i, lim) in enumerate(self.limits):
@@ -205,9 +206,6 @@ class AR3(Node):
             millis = int(now * 1000)
             msg = struct.pack('<QB' + 'i'*NUM_J, millis, limit_mask, *enc)
             self.hw_socket.send(msg) # send over ZMQ and block for firmware to process
-            steps = self.hw_socket.recv()
-            if steps:
-              self.handle_raw_steps(steps)
 
 
     def handle_raw_steps(self, steps):
