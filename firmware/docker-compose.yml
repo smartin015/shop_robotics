@@ -2,11 +2,13 @@ version: "3.8"
 services:
   fw_native:
     build: .
-    image: l2pio
+    image: shop_robotics_firmware
     stdin_open: true
     tty: true
     network_mode: host
     working_dir: /volume
+    devices:
+      - "/dev/ttyUSB0"
     # entrypoint: ["bash", "-c", "pio run -e native && .pio/build/native/program"]
     volumes:
       - ".:/volume"

@@ -6,12 +6,13 @@ from functools import reduce
 NUM_J = 6
 
 ctx = zmq.Context()
+# Follow default bind/connect behavior in http://czmq.zeromq.org/czmq4-0:zsock
 push = ctx.socket(zmq.PUSH)
 push.connect("tcp://0.0.0.0:5559")
 pull = ctx.socket(zmq.PULL)
-pull.connect("tcp://0.0.0.0:5558")
+pull.bind("tcp://0.0.0.0:5558")
 sim = ctx.socket(zmq.REQ)
-sim.bind("ipc:///tmp/shop_robotics_hw.ipc")
+sim.connect("ipc:///tmp/shop_robotics_hw.ipc")
 
 def sameData(aa, bb):
   if aa is None or bb is None:
@@ -21,9 +22,11 @@ def sameData(aa, bb):
 data_struct_fmt = "<BB" + "B"*NUM_J + "i"*NUM_J + "h"*NUM_J + "h"*NUM_J + "Q"
 queue_avail = 0
 stopping = False
+fresh = False
 def read_forever():
   global queue_avail
   global stopping
+  global fresh
   last = None
   while True:
     try:
@@ -32,10 +35,11 @@ def read_forever():
       continue
     data = struct.unpack(data_struct_fmt, packet);
     if not sameData(last, data):
-      print("Data: ", data)
+      print("SER: ", data)
     last = data
     queue_avail = data[2]
     stopping = data[1] != 0
+    fresh = True
 print("Starting read loop")
 threading.Thread(target=read_forever, daemon=True).start()
 
@@ -57,7 +61,8 @@ while True:
   msg = struct.pack('<QB' + 'i'*NUM_J, micros, limit_mask, *enc)
   sim.send(msg)
   packet = sim.recv()
-  if queue_avail > 3 and not stopping:
+  if queue_avail > 3 and not stopping and fresh:
+    fresh = False
     if writeab:
       print("write 1")
       send(joint_num=0, curve_id=1, shift_y=0, scale_y=10 * 256, length_usec=100*1000)
@@ -67,5 +72,5 @@ while True:
     writeab = not writeab
   if micros > next_report_micros:
     steps = struct.unpack("<" + "i"*NUM_J, packet)
-    print(steps)
+    print("HW:", steps)
     next_report_micros += REPORT_INTERVAL 

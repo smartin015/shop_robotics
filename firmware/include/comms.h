@@ -3,14 +3,10 @@
 
 #include <stdint.h>
 
-namespace comms {
+#define PACKET_START_BYTE 0xaa
 
-void init();
-int read(uint8_t* buf, int buflen);
-void write(uint8_t* buf, int buflen);
-bool available();
-void printf(const char* format, ...);
-
-} // namespace comms
+uint8_t * comms_preWrite(uint8_t sz);
+void comms_flush(uint8_t sz);
+void comms_printf(const char* format, ...);
 
 #endif // COMMS_H
