@@ -95,9 +95,49 @@ int _write(int file, char *data, int len) {
 
 
 #define DIR_PORT GPIOD
-const uint16_t DIR_PINS[] = {DIR_J1_Pin,  DIR_J2_Pin, DIR_J3_Pin, DIR_J4_Pin, DIR_J5_Pin, DIR_J6_Pin};
-#define LIMIT_PORT GPIOE
-const uint16_t LIMIT_PINS[] = {LIM_J1_Pin, LIM_J2_Pin, LIM_J3_Pin, LIM_J4_Pin, LIM_J5_Pin, LIM_J6_Pin};
+const uint16_t DIR_PINS[] = {
+		DIR_J1_Pin,
+		DIR_J2_Pin,
+		DIR_J3_Pin,
+		DIR_J4_Pin,
+		DIR_J5_Pin,
+		DIR_J6_Pin
+};
+#define LIMIT_PORT GPIOB
+const uint16_t LIMIT_PINS[] = {
+		LIM_J1_Pin,
+		LIM_J2_Pin,
+		LIM_J3_Pin,
+		LIM_J4_Pin,
+		LIM_J5_Pin,
+		LIM_J6_Pin
+};
+#define ENC_PORT GPIOE
+const uint16_t ENCA_PINS[] = {
+	ENC_J1A_Pin,
+	ENC_J2A_Pin,
+	ENC_J3A_Pin,
+	ENC_J4A_Pin,
+	ENC_J5A_Pin,
+	ENC_J6A_Pin
+};
+const uint16_t ENCB_PINS[] = {
+	ENC_J1B_Pin,
+	ENC_J2B_Pin,
+	ENC_J3B_Pin,
+	ENC_J4B_Pin,
+	ENC_J5B_Pin,
+	ENC_J6B_Pin
+};
+#define EN_PORT GPIOA
+const uint16_t EN_PINS[] = {
+	EN_J1_Pin,
+	EN_J2_Pin,
+	EN_J3_Pin,
+	EN_J4_Pin,
+	EN_J5_Pin,
+	EN_J6_Pin,
+};
 
 // See https://microcontrollerslab.com/led-blinking-tutorial-stm32f4-discovery-board-gpio-hal-library/
 #define LED_PORT GPIOD
@@ -106,32 +146,34 @@ void hw_set_dir_and_pwm(uint8_t j, int16_t hz) {
   TIM_HandleTypeDef tmr;
   switch(j) {
     case 0:
-      tmr = htim3; // PWM_J1_Pin
+      tmr = htim3; // PWM_J1_Pin (500hz)
       break;
     case 1:
-      tmr = htim4; // PWM_J2_Pin
+      tmr = htim4; // PWM_J2_Pin (600hz)
       break;
     case 2:
-      tmr = htim10; // PWM_J3_Pin
+      tmr = htim10; // PWM_J3_Pin 0.706ms (700hz)
       break;
     case 3:
-      tmr = htim11; // PWM_J4_Pin
+      tmr = htim11; // PWM_J4_Pin (0.618ms / 800hz)
       break;
     case 4:
-      tmr = htim13; // PWM_J5_Pin
+      tmr = htim13; // PWM_J5_Pin (900hz)
       break;
     case 5:
-      tmr = htim14; // PWM_J6_Pin
+      tmr = htim14; // PWM_J6_Pin (1000hz)
       break;
     default:
       return;
   } 
   HAL_TIM_PWM_Stop(&tmr, TIM_CHANNEL_1);
   HAL_GPIO_WritePin(DIR_PORT, DIR_PINS[j], (hz > 0) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(EN_PORT, EN_PINS[j], (hz == 0) ? GPIO_PIN_SET : GPIO_PIN_RESET); // Active low
   if (hz < 0) {
     hz = -hz;
   }
   if (hz != 0) {
+
     //tmr.Instance->PSC = TIM_PSC; // handled on init
     // (PSC+1)*(ARR+1) = TIMclk/Updatefrequency
     uint16_t arr = (TIM_CLK/hz)/(TIM_PSC+1) - 1; 
@@ -246,7 +288,7 @@ uint16_t encoder_pos[NUM_J];
 uint8_t encoder_idx[NUM_J];
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	uint8_t j = 0;
-	uint16_t data = LIMIT_PORT->ODR;
+	uint16_t data = ENC_PORT->IDR;
 	uint16_t pin1;
 	uint16_t pin2;
 	switch (GPIO_Pin) {
@@ -285,7 +327,7 @@ uint16_t hw_enc_read(uint8_t j) {
 }
 
 uint8_t hw_limits_read() {
-  uint16_t data = LIMIT_PORT->ODR;
+  uint16_t data = LIMIT_PORT->IDR;
   uint8_t result = 0;
   for (int j = 0; j < NUM_J; j++) {
 	  result |= (!!(data & LIMIT_PINS[j])) << j;
@@ -308,6 +350,37 @@ uint32_t hw_micros() {
 
 void setup();
 void loop();
+
+
+#define TEST_ROUTINE 1
+void run_test_routine(int step) {
+	// Set PWM outputs (different values to show all are configured)
+	int dir = 0;
+	if (step == 1) dir = 1;
+	else if (step == 3) dir = -1;
+
+	for (int j = 0; j < NUM_J; j++) {
+		hw_set_dir_and_pwm(j, dir * (500 + 100*j));
+	}
+
+	// Read limits
+	uint8_t limits = hw_limits_read();
+
+	// Read encoders
+	uint16_t enc_data = ENC_PORT->IDR;
+	char encA[NUM_J+1];
+	char encB[NUM_J+1];
+	char lim[NUM_J+1];
+	for (int j = 0; j < NUM_J; j++) {
+		encA[j] = (enc_data & ENCA_PINS[j]) ? '1' : '0';
+		encB[j] = (enc_data & ENCB_PINS[j]) ? '1' : '0';
+		lim[j] = (limits & (1 << j)) ? '1' : '0';
+	}
+	encA[NUM_J] = '\0';
+	encB[NUM_J] = '\0';
+	lim[NUM_J] = '\0';
+	printf("TEST%d LIM=%s ENCA=%s ENCB=%s\r\n", (dir > 0) ? 1 : 0, lim, encA, encB);
+}
 
 /* USER CODE END PFP */
 
@@ -365,14 +438,25 @@ int main(void)
 
   // Continue with regular initialization
   setup();
+#ifdef TEST_ROUTINE
+  int test_step = 1;
+#endif
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1) {
+
+#ifdef TEST_ROUTINE
+	  test_step = (test_step + 1) % 4;
+	run_test_routine(test_step);
+	HAL_Delay(500);
+#else
 	check_limits();
 	loop();
+#endif
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -561,11 +645,11 @@ static void MX_TIM4_Init(void)
 
   /* USER CODE END TIM4_Init 1 */
   htim4.Instance = TIM4;
-  htim4.Init.Prescaler = 0;
+  htim4.Init.Prescaler = 64;
   htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim4.Init.Period = 65535;
   htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
   {
     Error_Handler();
@@ -871,6 +955,10 @@ static void MX_GPIO_Init(void)
                           |DIR_J2_Pin|DIR_J3_Pin|DIR_J4_Pin|DIR_J5_Pin
                           |DIR_J6_Pin, GPIO_PIN_RESET);
 
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOA, EN_J1_Pin|EN_J2_Pin|EN_J3_Pin|EN_J4_Pin
+                          |EN_J5_Pin|EN_J6_Pin, GPIO_PIN_RESET);
+
   /*Configure GPIO pins : ENC_J2A_Pin ENC_J2B_Pin ENC_J3A_Pin ENC_J3B_Pin
                            ENC_J4A_Pin ENC_J1A_Pin ENC_J1B_Pin */
   GPIO_InitStruct.Pin = ENC_J2A_Pin|ENC_J2B_Pin|ENC_J3A_Pin|ENC_J3B_Pin
@@ -901,6 +989,15 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : EN_J1_Pin EN_J2_Pin EN_J3_Pin EN_J4_Pin
+                           EN_J5_Pin EN_J6_Pin */
+  GPIO_InitStruct.Pin = EN_J1_Pin|EN_J2_Pin|EN_J3_Pin|EN_J4_Pin
+                          |EN_J5_Pin|EN_J6_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pins : DIR_J1_Pin DIR_J2_Pin DIR_J3_Pin DIR_J4_Pin
                            DIR_J5_Pin DIR_J6_Pin */
