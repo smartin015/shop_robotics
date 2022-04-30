@@ -146,7 +146,7 @@ services:
       - /tmp:/tmp # IPC
     # entrypoint: bash
     # --stream="port=2000"
-    command: /usr/local/webots/webots --batch --mode=realtime --stream /volume/webots/worlds/world.wbt
+    command: /usr/local/webots/webots --batch --mode=realtime --stream /volume/webots/worlds/$WORLD
     profiles:
      - webots
 
